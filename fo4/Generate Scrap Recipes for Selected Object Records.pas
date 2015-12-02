@@ -19,8 +19,8 @@ var
 	slMasters: TStringList;
 begin
 	// populate masters list
-  slMasters := TStringList.Create;
-  slMasters.Add('Fallout4.esm');
+	slMasters := TStringList.Create;
+	slMasters.Add('Fallout4.esm');
 
 	// prompt to select file
 	targetFile := FileSelect('Select file to target:');
