@@ -1,5 +1,5 @@
 {
-	Purpose: Make Selected Objects Scrappable
+	Purpose: To generate scrap recipes for the selected object records
 	Games: Fallout 4
 	Author: fireundubh <fireundubh@gmail.com>
 	Version: 0.1
