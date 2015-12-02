@@ -4,16 +4,17 @@ This is a repository of fireundubh's "released" scripts for xEdit.
 
 Other scripts can be found [here](https://drive.google.com/folderview?id=0B0o3cG8Q52tpeTd1VjZ0QU5TN1E&usp=sharing#list).
 
-## lib
+## Libraries
 
-### dubhFunctions
+### dubhFunctions.pas
 
-A collection of functions and procedures that make my life easier. All of
-my scripts require dubhFunctions, which in turn requires [mteFunctions](https://github.com/matortheeternal/TES5EditScripts/blob/master/Edit%20Scripts/mteFunctions.pas).
+A collection of functions and procedures that make my life easier.
+
+All of my scripts require dubhFunctions, which in turn requires [mteFunctions](https://github.com/matortheeternal/TES5EditScripts/blob/master/Edit%20Scripts/mteFunctions.pas).
 
 ## Fallout 4
 
-### Make Selected Objects Scrappable
+### Make Selected Objects Scrappable.pas
 
 Automatically generate COBJ and FLST records to make any object scrappable.
 
@@ -25,8 +26,7 @@ Instructions:
 4. Right-click any selected record and apply the script.
 5. Select the target plugin from the dropdown menu.
 6. Click OK.
-7. Type the object name using alphanumeric characters. Spaces will be removed.
-   Advice: Use the base of an object's Editor ID (e.g., Bramble.)
+7. Type the object name using alphanumeric characters. Spaces will be removed. You are advised to use the generic version of an object's Editor ID (e.g., Bramble) for organizational purposes.
 8. Click OK.
 
 If there are no errors, the script will create COBJ and FLST records in the
@@ -34,10 +34,9 @@ target plugin, as well as named overrides of the scrappable object records.
 
 ## All Games
 
-### Generate Tags for Wrye Bash
+### Generate Tags for Wrye Bash.pas
 
-Automatically generate tags for Wrye Bash by processing the appropriate
-elements in any plugin for all Bethesda Softworks games.
+Automatically generate tags for Wrye Bash by processing the appropriate elements in any plugin for all Bethesda Softworks games.
 
 Instructions:
 
