@@ -14,7 +14,7 @@ All of my scripts require dubhFunctions, which in turn requires [mteFunctions](h
 
 ## Fallout 4
 
-### Make Selected Objects Scrappable.pas
+### Generate Scrap Recipes for Selected Object Records.pas
 
 Automatically generate COBJ and FLST records to make any object scrappable.
 
