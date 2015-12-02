@@ -36,7 +36,7 @@ target plugin, as well as named overrides of the scrappable object records.
 
 ### Generate Tags for Wrye Bash.pas
 
-Automatically generate tags for Wrye Bash by processing the appropriate elements in any plugin for all Bethesda Softworks games.
+Automatically generate tags for Wrye Bash by processing all records in any plugin for all Bethesda Softworks games.
 
 Instructions:
 
