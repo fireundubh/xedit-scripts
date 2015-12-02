@@ -17,9 +17,17 @@ function Initialize: Integer;
 var
 	grup_cobj, grup_flst, cobj, cobj_edid, cobj_fvpa, cobj_desc, cobj_cnam, cobj_fnam, cobj_intv, flst_edid: IInterface;
 	sObjectName: String;
+	slMasters: TStringList;
 begin
+	// populate masters list
+  slMasters := TStringList.Create;
+  slMasters.Add('Fallout4.esm');
+
 	// prompt to select file
 	targetFile := FileSelect('Select file to target:');
+
+	// add master if needed - for creating a new file with FileSelect
+	AddMastersToFile(targetFile, slMasters, false);
 
 	// prompt to name form list
 	if not InputQuery('Object Name', 'Name:', sObjectName) then
