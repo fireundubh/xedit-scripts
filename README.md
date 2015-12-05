@@ -18,8 +18,6 @@ All of my scripts require dubhFunctions, which in turn requires [mteFunctions](h
 
 Automatically generate COBJ and FLST records to make any object scrappable.
 
-Instructions:
-
 1. Create a new plugin, or load an editable plugin.
 2. Under Fallout4.esm, find the records you want to make scrappable.
 3. Select a single record, or hold shift and select multiple records.
@@ -39,14 +37,14 @@ An older build of xEdit did not copy over MSWP fields when copying records as ne
 1. Load the plugin you want to fix.
 2. Select a single record, or hold shift and select multiple records.
 3. Right-click any selected record and apply the script.
+4. Select the source plugin from the dropdown menu.
+5. Click OK.
 
 ## All Games
 
 ### Generate Tags for Wrye Bash.pas
 
 Automatically generate tags for Wrye Bash by processing all records in any plugin for all Bethesda Softworks games.
-
-Instructions:
 
 1. Load only the plugin for which you want to generate tags.
 2. Right-click the name of the plugin and apply the script.
