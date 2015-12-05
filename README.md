@@ -30,7 +30,7 @@ Automatically generate COBJ and FLST records to make any object scrappable.
 If there are no errors, the script will create COBJ and FLST records in the
 target plugin, as well as named overrides of the scrappable object records.
 
-### Restore Material Swap Fields
+### Restore Material Swap Fields.pas
 
 An older build of xEdit did not copy over MODS fields when copying records as new or overrides. This script restores those fields, if the Editor IDs of the selected records match the Editor IDs of the source records. If the EDID fields do not match, the MODS fields will have to be restored manually.
 
