@@ -1,11 +1,3 @@
-{
-	Purpose: Extensions for mteFunctions
-	Author: fireundubh <fireundubh@gmail.com>
-	Version:
-		- 0.2: December 1, 2015
-		- 0.1: Long, long ago
-}
-
 unit dubhFunctions;
 uses mteFunctions;
 
