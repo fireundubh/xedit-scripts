@@ -12,7 +12,7 @@ uses mteFunctions;
 // --------------------------------------------------------------------
 // AddMessage
 // --------------------------------------------------------------------
-function Log(s: string): Integer;
+procedure Log(s: string);
 begin
 	AddMessage(s);
 end;
@@ -31,6 +31,14 @@ end;
 function sev(x: IInterface; s: String): Integer;
 begin
 	SetEditValue(x, s);
+end;
+
+// --------------------------------------------------------------------
+// ElementCount - 1
+// --------------------------------------------------------------------
+function prc(x: IInterface): Integer;
+begin
+	Result := Pred(ElementCount(x));
 end;
 
 // --------------------------------------------------------------------
@@ -437,6 +445,20 @@ begin
 end;
 
 // --------------------------------------------------------------------
+// Returns an element by string, or adds the element if needed
+// --------------------------------------------------------------------
+function AssignElementByString(r: IInterface; s: String): IInterface;
+var
+	e: IInterface;
+begin
+	e := GetElement(r, s);
+	if Assigned(e) then
+		Result := ElementAssign(e, HighInteger, nil, true)
+	else
+		AddMessage('Failed to assign element to: ' + SmallNameEx(r));
+end;
+
+// --------------------------------------------------------------------
 // Adds a form to a formlist
 // --------------------------------------------------------------------
 procedure AddRecordToFormList(f, r: IInterface);
@@ -444,8 +466,7 @@ var
 	l: IInterface;
 begin
 	l := ElementAssign(f, HighInteger, nil, true);
-	SetEditValue(l, SmallNameEx(r));
-	// TODO: HexFormID() would probably be faster by a tiny number of time units
+	SetEditValue(l, IntToHex(FixedFormID(r), 8));
 end;
 
 // --------------------------------------------------------------------
