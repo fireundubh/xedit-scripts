@@ -32,6 +32,14 @@ Instructions:
 If there are no errors, the script will create COBJ and FLST records in the
 target plugin, as well as named overrides of the scrappable object records.
 
+### Restore Material Swap Fields
+
+An older build of xEdit did not copy over MSWP fields when copying records as new or overrides. This script restores those fields, if the Editor IDs of the selected records match the Editor IDs of the source records. If the EDID fields do not match, the MSWP fields will have to be restored manually.
+
+1. Load the plugin you want to fix.
+2. Select a single record, or hold shift and select multiple records.
+3. Right-click any selected record and apply the script.
+
 ## All Games
 
 ### Generate Tags for Wrye Bash.pas
