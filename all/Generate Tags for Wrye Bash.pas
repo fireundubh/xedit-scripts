@@ -1,29 +1,3 @@
-{
-	Purpose: Automatic Bash Tag Generation
-	Games: FO3/FNV/TES4/TES5
-	Author: fireundubh <fireundubh@gmail.com>
-	Version: 1.5.1.2
-
-	Description: This script detects up to 58 bash tags in FO3, FNV, TES4, and TES5 plugins.
-	Tags can be automatically added to the Description in the File Header. Wrye Bash/Flash can
-	then use these tags to help you create more intelligent bashed patches.
-
-	Requires dubhFunctions which requires mteFunctions:
-	https://github.com/matortheeternal/TES5EditScripts/blob/master/trunk/Edit%20Scripts/mteFunctions.pas
-
-	Credits:
-	- zilav (BASH tags autodetection.pas v1.0)
-	- matortheeternal (mteFunctions.pas)
-
-	Testers:
-	- alt3rn1ty
-	- Arthmoor
-	- InsanePlumber
-	- matortheeternal
-	- Sharlikran
-	- zilav
-}
-
 unit BashTagsDetector;
 
 uses dubhFunctions;
@@ -31,8 +5,8 @@ uses dubhFunctions;
 var
 	f: IwbFile;
 	slTags: TStringList;
-	fn, tag, game: string;
-	optionSelected: integer;
+	fn, tag, game: String;
+	optionSelected: Integer;
 
 // ******************************************************************
 // FUNCTIONS
@@ -40,23 +14,23 @@ var
 
 // ==================================================================
 // Returns True if the flags set are different and False if not
-function CompareFlagsEx(x, y: IInterface; p, f: string): boolean;
+function CompareFlagsEx(x, y: IInterface; p, f: String): Boolean;
 begin
 	Result := (HasFlag(GetElement(x, p), f) <> HasFlag(GetElement(y, p), f)); // Comparison: <>
 end;
 
 // ==================================================================
 // Returns True if any two flags are set and False if not
-function CompareFlagsOr(x, y: IInterface; p, f: string): boolean;
+function CompareFlagsOr(x, y: IInterface; p, f: String): Boolean;
 begin
 	Result := (HasFlag(GetElement(x, p), f) or HasFlag(GetElement(y, p), f)); // Comparison: or
 end;
 
 // ==================================================================
 // Returns True if the set flags are different and False if not
-function CompareKeys(x, y: IInterface; debug: boolean): boolean;
+function CompareKeys(x, y: IInterface; debug: Boolean): Boolean;
 var
-	sx, sy: string;
+	sx, sy: String;
 begin
 	if (ConflictAllString(ContainingMainRecord(x)) = 'caUnknown')
 	or (ConflictAllString(ContainingMainRecord(x)) = 'caOnlyOne')
@@ -79,16 +53,16 @@ end;
 
 // ==================================================================
 // Returns True if the native values are different and False if not
-function CompareNativeValues(x, y: IInterface; s: string): boolean;
+function CompareNativeValues(x, y: IInterface; s: String): Boolean;
 begin
 	Result := (GetNativeValue(GetElement(x, s)) <> GetNativeValue(GetElement(y, s)));
 end;
 
 // ==================================================================
 // Get element from list by some value
-function GetElementByValue(el: IInterface; smth, somevalue: string): IInterface;
+function GetElementByValue(el: IInterface; smth, somevalue: String): IInterface;
 var
-	i: integer;
+	i: Integer;
 	entry: IInterface;
 begin
 	Result := nil;
@@ -103,11 +77,11 @@ end;
 
 // ==================================================================
 // Retrieve a string between two expressions
-function GetSubstring(input, expr1, expr2: string): string;
+function GetSubstring(input, expr1, expr2: String): String;
 var
-	pos1, pos2, len: integer;
+	pos1, pos2, len: Integer;
 begin
-  pos1 := ItPos(expr1, input, 1) + length(expr1);
+  pos1 := ItPos(expr1, input, 1) + Length(expr1);
   pos2 := ItPos(expr2, input, 1);
   len := pos2 - pos1;
   Result := Copy(input, pos1, len);
@@ -117,9 +91,9 @@ end;
 // Generate a list from the differences between list1 and list2
 // -- list1: existing tags, for example
 // -- list2: suggested tags, for example
-function GetDiffList(list1, list2: TStringList): string;
+function GetDiffList(list1, list2: TStringList): String;
 var
-	i, j: integer;
+	i, j: Integer;
 begin
 	for i := list1.Count - 1 downto 0 do begin
 		for j := list2.Count - 1 downto 0 do begin
@@ -132,10 +106,10 @@ end;
 
 // ==================================================================
 // Return True if specific flag is set and False if not
-function HasFlag(f: IInterface; s: string): boolean;
+function HasFlag(f: IInterface; s: String): Boolean;
 var
 	flags, templateFlags, cellFlags, recordFlags: TStringList;
-	i: integer;
+	i: Integer;
 begin
 	// create flag lists
 	flags := TStringList.Create;
@@ -168,9 +142,9 @@ end;
 
 // ==================================================================
 // Returns True if the string contains only zeroes and False if not
-function IsEmptyKey(s: string): boolean;
+function IsEmptyKey(s: String): Boolean;
 var
-	i: integer;
+	i: Integer;
 begin
 	for i := 1 to length(s) do begin
 		if s[i] = '1' then begin
@@ -179,21 +153,6 @@ begin
 		end;
 		Result := true;
 	end;
-end;
-
-// ==================================================================
-// Returns True if the x FormID is in the y list of FormIDs to ignore
-// z is the file that contains the FormIDs to ignore
-function InIgnoreList(x, y: string): boolean;
-var
-	formids: TStringList;
-	i: integer;
-begin
-	formids := TStringList.Create;
-	formids.DelimitedText := y;
-	i := formids.IndexOf(x);
-	formids.Free;
-	Result := (i > -1);
 end;
 
 // ==================================================================
@@ -213,7 +172,7 @@ end;
 
 // ==================================================================
 // Check if the tag already exists
-function TagExists(t: string): boolean;
+function TagExists(t: string): Boolean;
 begin
 	Result := (slTags.IndexOf(t) <> -1);
 end;
@@ -224,7 +183,7 @@ end;
 
 // ==================================================================
 // Add the tag if the tag does not exist
-procedure AddTag(t: string);
+procedure AddTag(t: String);
 begin
 	if not TagExists(t) then slTags.Add(t);
 end;
@@ -233,7 +192,7 @@ end;
 // Evaluate
 // Determines whether two elements are different and suggests tags
 // Not to be used when you need to know how two elements differ
-procedure Evaluate(x, y: IInterface; tag: string; debug: boolean);
+procedure Evaluate(x, y: IInterface; tag: String; debug: Boolean);
 begin
 	// Exit if the tag already exists
 	if TagExists(tag) then exit;
@@ -282,14 +241,14 @@ end;
 
 // ==================================================================
 // EvaluateEx
-procedure EvaluateEx(x, y: IInterface; z: string; tag: string; debug: boolean);
+procedure EvaluateEx(x, y: IInterface; z: String; tag: String; debug: Boolean);
 begin
 	Evaluate(GetElement(x, z), GetElement(y, z), tag, debug);
 end;
 
 // ==================================================================
 // Actors.ACBS
-procedure CheckActorsACBS(e, m: IInterface; debug: boolean);
+procedure CheckActorsACBS(e, m: IInterface; debug: Boolean);
 var
 	f, fm: IInterface;
 begin
@@ -337,7 +296,7 @@ end;
 
 // ==================================================================
 // Actors.AIData
-procedure CheckActorsAIData(e, m: IInterface; debug: boolean);
+procedure CheckActorsAIData(e, m: IInterface; debug: Boolean);
 var
 	a, am: IInterface;
 begin
@@ -368,7 +327,7 @@ end;
 
 // ==================================================================
 // Actors.AIPackages
-procedure CheckActorsAIPackages(e, m: IInterface; debug: boolean);
+procedure CheckActorsAIPackages(e, m: IInterface; debug: Boolean);
 begin
 	// define tag
 	tag := 'Actors.AIPackages';
@@ -382,7 +341,7 @@ end;
 
 // ==================================================================
 // Factions
-procedure CheckActorsFactions(e, m: IInterface; debug: boolean);
+procedure CheckActorsFactions(e, m: IInterface; debug: Boolean);
 var
 	f, fm: IInterface;
 begin
@@ -412,7 +371,7 @@ end;
 
 // ==================================================================
 // Actors.Skeleton
-procedure CheckActorsSkeleton(e, m: IInterface; debug: boolean);
+procedure CheckActorsSkeleton(e, m: IInterface; debug: Boolean);
 var
 	x, y: IInterface;
 begin
@@ -437,10 +396,10 @@ end;
 
 // ==================================================================
 // Actors.Stats
-procedure CheckActorsStats(e, m: IInterface; debug: boolean);
+procedure CheckActorsStats(e, m: IInterface; debug: Boolean);
 var
 	d, dm: IInterface;
-	sig: string;
+	sig: String;
 begin
 	// define tag
 	tag := 'Actors.Stats';
@@ -475,7 +434,7 @@ end;
 
 // ==================================================================
 // C.Climate
-procedure CheckCellClimate(e, m: IInterface; debug: boolean);
+procedure CheckCellClimate(e, m: IInterface; debug: Boolean);
 var
 	d, dm: IInterface;
 begin
@@ -500,9 +459,9 @@ end;
 
 // ==================================================================
 // C.RecordFlags
-procedure CheckCellRecordFlags(e, m: IInterface; debug: boolean);
+procedure CheckCellRecordFlags(e, m: IInterface; debug: Boolean);
 var
-	sig: string;
+	sig: String;
 	f, fm, rf, rfm: IInterface;
 begin
 	// define tag
@@ -525,7 +484,7 @@ end;
 
 // ==================================================================
 // C.SkyLighting
-procedure CheckCellSkyLighting(e, m: IInterface; debug: boolean);
+procedure CheckCellSkyLighting(e, m: IInterface; debug: Boolean);
 begin
 	// define tag
 	tag := 'C.SkyLighting';
@@ -543,7 +502,7 @@ end;
 
 // ==================================================================
 // C.Water
-procedure CheckCellWater(e, m: IInterface; debug: boolean);
+procedure CheckCellWater(e, m: IInterface; debug: Boolean);
 begin
 	// define tag
 	tag := 'C.Water';
@@ -568,13 +527,13 @@ end;
 
 // ==================================================================
 // Delev, Relev
-procedure CheckDelevRelev(e, m: IInterface; debug: boolean);
+procedure CheckDelevRelev(e, m: IInterface; debug: Boolean);
 var
-	i, matched: integer;
+	i, matched: Integer;
 	entries, entriesmaster: IInterface; // leveled list entries
 	ent, entm: IInterface; // leveled list entry
 	coed, coedm: IInterface; // extra data
-	s1, s2: string; // sortkeys for extra data, sortkey is a compact text representation of element's values
+	s1, s2: String; // sortkeys for extra data, sortkey is a compact text representation of element's values
 begin
 	// nothing to do if already tagged
 	if TagExists('Delev') and TagExists('Relev') then exit;
@@ -633,7 +592,7 @@ end;
 
 // ==================================================================
 // Destructible
-procedure CheckDestructible(e, m: IInterface; debug: boolean);
+procedure CheckDestructible(e, m: IInterface; debug: Boolean);
 var
 	d, dm, df, dfm, dd, dmd: IInterface;
 begin
@@ -680,11 +639,11 @@ end;
 
 // ==================================================================
 // Graphics
-procedure CheckGraphics(e, m: IInterface; debug: boolean);
+procedure CheckGraphics(e, m: IInterface; debug: Boolean);
 var
 	icon, iconm, modl, modlm, fpf, fpfm, gf, gfm, bpf, bpfm, rf, rfm: IInterface;
-	sig: string;
-	i: integer;
+	sig: String;
+	i: Integer;
 begin
 	// define tag
 	tag := 'Graphics';
@@ -696,11 +655,19 @@ begin
 	sig := Signature(e);
 
 	// evaluate Icon properties
-	if InSignatureList(sig, 'ALCH, AMMO, APPA, BOOK, BSGN, CLAS, INGR, KEYM, LIGH, LSCR, LTEX, MGEF, MISC, REGN, SGST, SLGM, TREE, WEAP') then
+	if (sig = 'ALCH') or (sig = 'AMMO') or (sig = 'APPA') or (sig = 'BOOK')
+	or (sig = 'BSGN') or (sig = 'CLAS') or (sig = 'INGR') or (sig = 'KEYM')
+	or (sig = 'LIGH') or (sig = 'LSCR') or (sig = 'LTEX') or (sig = 'MGEF')
+	or (sig = 'MISC') or (sig = 'REGN') or (sig = 'SGST') or (sig = 'SLGM')
+	or (sig = 'TREE') or (sig = 'WEAP') then
 		EvaluateEx(e, m, 'Icon', tag, debug);
 
 	// evaluate Model properties
-	if InSignatureList(sig, 'ACTI, ALCH, AMMO, APPA, BOOK, DOOR, FLOR, FURN, GRAS, INGR, KEYM, LIGH, MGEF, MISC, SGST, SLGM, STAT, TREE, WEAP') then
+	if (sig = 'ACTI') or (sig = 'ALCH') or (sig = 'AMMO') or (sig = 'APPA')
+	or (sig = 'BOOK') or (sig = 'DOOR') or (sig = 'FLOR') or (sig = 'FURN')
+	or (sig = 'GRAS') or (sig = 'INGR') or (sig = 'KEYM') or (sig = 'LIGH')
+	or (sig = 'MGEF') or (sig = 'MISC') or (sig = 'SGST') or (sig = 'SLGM')
+	or (sig = 'STAT') or (sig = 'TREE') or (sig = 'WEAP') then
 		EvaluateEx(e, m, 'Model', tag, debug);
 
 	// evaluate ARMO properties
@@ -845,7 +812,7 @@ end;
 
 // ==================================================================
 // Invent
-procedure CheckInvent(e, m: IInterface; debug: boolean);
+procedure CheckInvent(e, m: IInterface; debug: Boolean);
 var
 	items, itemsmaster: IInterface;
 begin
@@ -876,7 +843,7 @@ end;
 
 // ==================================================================
 // NpcFaces
-procedure CheckNPCFaces(e, m: IInterface; debug: boolean);
+procedure CheckNPCFaces(e, m: IInterface; debug: Boolean);
 begin
 	// define tag
 	tag := 'NpcFaces';
@@ -894,7 +861,7 @@ end;
 
 // ==================================================================
 // Body-F | Body-M | Body-Size-F | Body-Size-M
-procedure CheckRaceBody(e, m: IInterface; tag: string; debug: boolean);
+procedure CheckRaceBody(e, m: IInterface; tag: String; debug: Boolean);
 begin
 	// define tag
 	if TagExists(tag) then exit;
@@ -922,7 +889,7 @@ end;
 
 // ==================================================================
 // R.Ears | R.Head | R.Mouth | R.Teeth
-procedure CheckRaceHead(e, m: IInterface; tag: string; debug: boolean);
+procedure CheckRaceHead(e, m: IInterface; tag: String; debug: Boolean);
 begin
 	// exit if tag exists
 	if TagExists(tag) then exit;
@@ -961,9 +928,9 @@ end;
 
 // ==================================================================
 // Sound
-procedure CheckSound(e, m: IInterface; debug: boolean);
+procedure CheckSound(e, m: IInterface; debug: Boolean);
 var
-	sig: string;
+	sig: String;
 begin
 	tag := 'Sound';
 	if TagExists(tag) then exit;
@@ -971,7 +938,7 @@ begin
 	sig := Signature(e);
 
 	// Activators, Containers, Doors, and Lights
-	if InSignatureList(sig, 'ACTI, CONT, DOOR, LIGH') then
+	if (sig = 'ACTI') or (sig = 'CONT') or (sig = 'DOOR') or (sig = 'LIGH') then
 		EvaluateEx(e, m, 'SNAM', tag, debug);
 
 	// Activators
@@ -1022,7 +989,7 @@ end;
 
 // ==================================================================
 // SpellStats
-procedure CheckSpellStats(e, m: IInterface; debug: boolean);
+procedure CheckSpellStats(e, m: IInterface; debug: Boolean);
 begin
 	// define tag
 	tag := 'SpellStats';
@@ -1037,10 +1004,10 @@ end;
 
 // ==================================================================
 // Stats - v1.4: 200% implementation (evaluates more than needed; too much work to narrow down)
-procedure CheckStats(e, m: IInterface; debug: boolean);
+procedure CheckStats(e, m: IInterface; debug: Boolean);
 var
 	d, dm: IInterface;
-	sig: string;
+	sig: String;
 begin
 	// define tag
 	tag := 'Stats';
@@ -1052,13 +1019,16 @@ begin
 	sig := Signature(e);
 
 	// Ingestibles, Ammunition, Alchemical Apparatuses, Armor, Books, Clothing, Ingredients, Keys, Lights, Misc. Items, Sigil Stones, Soul Gems, Weapons
-	if InSignatureList(sig, 'ALCH, AMMO, APPA, ARMO, BOOK, CLOT, INGR, KEYM, LIGH, MISC, SGST, SLGM, WEAP') then begin
+	if (sig = 'ALCH') or (sig = 'AMMO') or (sig = 'APPA') or (sig = 'ARMO')
+	or (sig = 'BOOK') or (sig = 'CLOT') or (sig = 'INGR') or (sig = 'KEYM')
+	or (sig = 'LIGH') or (sig = 'MISC') or (sig = 'SGST') or (sig = 'SLGM')
+	or (sig = 'WEAP') then begin
 		EvaluateEx(e, m, 'EDID', tag, debug);
 		EvaluateEx(e, m, 'DATA', tag, debug);
 	end;
 
 	// ARMA
-	if InSignatureList(sig, 'ARMA, ARMO, WEAP') then
+	if (sig = 'ARMA') or (sig = 'ARMO') or (sig = 'WEAP') then
 		EvaluateEx(e, m, 'DNAM', tag, debug);
 
 	// ARMO
@@ -1068,7 +1038,7 @@ end;
 
 // ==================================================================
 // Debug Message
-procedure PrintDebugE(x, y: IInterface; t: string);
+procedure PrintDebugE(x, y: IInterface; t: String);
 begin
 	AddMessage(t + ': ' + TrimLeft(FullPath(x)));
 	AddMessage(t + ': ' + TrimLeft(FullPath(y)));
@@ -1076,7 +1046,7 @@ end;
 
 // ==================================================================
 // Debug Message
-procedure PrintDebugS(x, y: IInterface; p, t: string);
+procedure PrintDebugS(x, y: IInterface; p, t: String);
 begin
 	AddMessage(t + ': ' + TrimLeft(FullPath(GetElement(x, p))));
 	AddMessage(t + ': ' + TrimLeft(FullPath(GetElement(y, p))));
@@ -1089,9 +1059,9 @@ end;
 
 // ==================================================================
 // Main
-function Initialize: integer;
+function Initialize: Integer;
 var
-	tmplLoaded: string;
+	tmplLoaded: String;
 begin
 	// clear
 	ClearMessages();
@@ -1100,7 +1070,8 @@ begin
 	optionSelected := MessageDlg('Do you want to add suggested tags to the file header?', mtConfirmation, [mbYes, mbNo, mbAbort], 0);
 
 	// exit if the user aborted
-	if optionSelected = mrAbort then exit;
+	if optionSelected = mrAbort then
+		Result := 1;
 
 	// create list of tags
 	slTags := TStringList.Create;
@@ -1116,18 +1087,14 @@ end;
 
 // ==================================================================
 // Process
-function Process(e: IInterface): integer;
+function Process(e: IInterface): Integer;
 var
 	o: IInterface; // master record
-	sig, fm: string;
-	i: integer;
+	sig, fm: String;
+	i: Integer;
 begin
-
-	//AddMessage('[PROCESSING] ' + FullPath(e));
-
 	// exit conditions
-	if (optionSelected = mrAbort)								// user aborted
-	or (Signature(e) = 'TES4')									// record is the file header
+	if (Signature(e) = 'TES4')									// record is the file header
 	or (ConflictAllString(e) = 'caUnknown')			// unknown conflict status
 	or (ConflictAllString(e) = 'caOnlyOne')			// record neither conflicts nor overrides
 	or (ConflictAllString(e) = 'caNoConflict') then	// no conflict
@@ -1138,8 +1105,19 @@ begin
 	fn := GetFileName(f);
 
 	// exit if the record should not be processed
-	if (fn = 'Dawnguard.esm')
-	and InIgnoreList(HexFormID(e), '00016BCF, 0001EE6D, 0001FA4C, 00039F67, 0006C3B6') then
+	if (fn = 'Dawnguard.esm') and (HexFormID(e) = '00016BCF') then
+		exit;
+
+	if (fn = 'Dawnguard.esm') and (HexFormID(e) = '0001EE6D') then
+		exit;
+
+	if (fn = 'Dawnguard.esm') and (HexFormID(e) = '0001FA4C') then
+		exit;
+
+	if (fn = 'Dawnguard.esm') and (HexFormID(e) = '00039F67') then
+		exit;
+
+	if (fn = 'Dawnguard.esm') and (HexFormID(e) = '0006C3B6') then
 		exit;
 
 	// get master record
@@ -1173,7 +1151,7 @@ begin
 	if (wbGameMode = gmTES4) then begin
 
 	// TAG: Actors.Spells
-		if InSignatureList(sig, 'CREA, NPC_') then
+		if (sig = 'CREA') or (sig = 'NPC_') then
 			EvaluateEx(e, o, 'Spells', 'Actors.Spells', true);
 
 	// TAG: Creatures.Blood
@@ -1230,11 +1208,14 @@ begin
 	// -------------------------------------------------------------------------------
 	if (wbGameMode = gmFO3) or (wbGameMode = gmFNV) then begin
 	// TAG: Destructible
-		if InSignatureList(sig, 'ACTI, ALCH, AMMO, BOOK, CONT, DOOR, FURN, IMOD, KEYM, MISC, MSTT, PROJ, TACT, TERM, WEAP') then
+		if (sig = 'ACTI') or (sig = 'ALCH') or (sig = 'AMMO') or (sig = 'BOOK')
+		or (sig = 'CONT') or (sig = 'DOOR') or (sig = 'FURN') or (sig = 'IMOD')
+		or (sig = 'KEYM') or (sig = 'MISC') or (sig = 'MSTT') or (sig = 'PROJ')
+		or (sig = 'TACT') or (sig = 'TERM') or (sig = 'WEAP')
 			CheckDestructible(e, o, true);
 
 	// TAG: Destructible - special handling for CREA and NPC_ record types
-		if InSignatureList(sig, 'CREA, NPC_') then
+		if (sig = 'CREA') or (sig = 'NPC_') then
 			if not CompareFlagsOr(e, o, 'ACBS\Template Flags', 'Use Model/Animation') then
 				CheckDestructible(e, o, true);
 	end; // end game
@@ -1244,7 +1225,7 @@ begin
 	// -------------------------------------------------------------------------------
 	if (wbGameMode = gmFO3) or (wbGameMode = gmFNV) or (wbGameMode = gmTES4) then begin
 	// TAG: Factions
-		if InSignatureList(sig, 'CREA, NPC_') then begin
+		if (sig = 'CREA') or (sig = 'NPC_') then begin
 			if (wbGameMode = gmTES4) then begin
 				CheckActorsFactions(e, o, true);
 			end else begin
@@ -1262,7 +1243,7 @@ begin
 	// GROUP: [3] Supported tags exclusive to FO3, FNV, and TES5
 	// -------------------------------------------------------------------------------
 	if (wbGameMode = gmFO3) or (wbGameMode = gmFNV) or (wbGameMode = gmTES5) then begin
-		if InSignatureList(sig, 'CREA, NPC_') then begin
+		if (sig = 'CREA') or (sig = 'NPC_') then begin
 	// TAG: Actors.ACBS
 			if not CompareFlagsOr(e, o, 'ACBS\Template Flags', 'Use Stats') then
 				CheckActorsACBS(e, o, true);
@@ -1381,7 +1362,10 @@ begin
 		// -- According to the Wrye Bash Readme: "Should not be used. Can cause serious issues."
 
 	// TAG: Scripts
-		if InSignatureList(sig, 'ACTI, ALCH, ARMO, CONT, DOOR, FLOR, FURN, INGR, KEYM, LIGH, LVLC, MISC, QUST, WEAP') then
+		if (sig = 'ACTI') or (sig = 'ALCH') or (sig = 'ARMO') or (sig = 'CONT')
+		or (sig = 'DOOR') or (sig = 'FLOR') or (sig = 'FURN') or (sig = 'INGR')
+		or (sig = 'KEYM') or (sig = 'LIGH') or (sig = 'LVLC') or (sig = 'MISC')
+		or (sig = 'QUST') or (sig = 'WEAP') then
 			EvaluateEx(e, o, 'SCRI', 'Scripts', true);
 	end; // end game
 
@@ -1415,13 +1399,19 @@ begin
 	// TODO: Deactivate - NOT IMPLEMENTED
 
 	// TAG: Delev, Relev
-		if InSignatureList(sig, 'LVLC, LVLI, LVLN, LVSP') then
+		if (sig = 'LVLC') or (sig = 'LVLI') or (sig = 'LVLN') or (sig = 'LVSP') then
 			CheckDelevRelev(e, o, true);
 
 	// TODO: Filter - NOT IMPLEMENTED
 
 	// TAG: Graphics
-		if InSignatureList(sig, 'ACTI, ALCH, AMMO, APPA, ARMO, BOOK, BSGN, CLAS, CLOT, CREA, DOOR, EFSH, FLOR, FURN, GRAS, INGR, KEYM, LIGH, LSCR, LTEX, MGEF, MISC, REGN, SGST, SLGM, STAT, TREE, WEAP') then
+		if (sig = 'ACTI') or (sig = 'ALCH') or (sig = 'AMMO') or (sig = 'APPA')
+		or (sig = 'ARMO') or (sig = 'BOOK') or (sig = 'BSGN') or (sig = 'CLAS')
+		or (sig = 'CLOT') or (sig = 'CREA') or (sig = 'DOOR') or (sig = 'EFSH')
+		or (sig = 'FLOR') or (sig = 'FURN') or (sig = 'GRAS') or (sig = 'INGR')
+		or (sig = 'KEYM') or (sig = 'LIGH') or (sig = 'LSCR') or (sig = 'LTEX')
+		or (sig = 'MGEF') or (sig = 'MISC') or (sig = 'REGN') or (sig = 'SGST')
+		or (sig = 'SLGM') or (sig = 'STAT') or (sig = 'TREE') or (sig = 'WEAP') then
 			CheckGraphics(e, o, true);
 
 	// TAG: Invent
@@ -1429,16 +1419,24 @@ begin
 			CheckInvent(e, o, true);
 
 	// TAG: Names
-		if InSignatureList(sig, 'ACTI, ALCH, AMMO, APPA, ARMO, BOOK, BSGN, CLAS, CLOT, CONT, DIAL, DOOR, ENCH, EYES, FACT, FLOR, FURN, HAIR, INGR, KEYM, LIGH, MGEF, MISC, QUST, RACE, SGST, SLGM, SPEL, WEAP, WRLD') then
+		if (sig = 'ACTI') or (sig = 'ALCH') or (sig = 'AMMO') or (sig = 'APPA')
+		or (sig = 'ARMO') or (sig = 'BOOK') or (sig = 'BSGN') or (sig = 'CLAS')
+		or (sig = 'CLOT') or (sig = 'CONT') or (sig = 'DIAL') or (sig = 'DOOR')
+		or (sig = 'ENCH') or (sig = 'EYES') or (sig = 'FACT') or (sig = 'FLOR')
+		or (sig = 'FURN') or (sig = 'HAIR') or (sig = 'INGR') or (sig = 'KEYM')
+		or (sig = 'LIGH') or (sig = 'MGEF') or (sig = 'MISC') or (sig = 'QUST')
+		or (sig = 'RACE') or (sig = 'SGST') or (sig = 'SLGM') or (sig = 'SPEL')
+		or (sig = 'WEAP') or (sig = 'WRLD') then
 			EvaluateEx(e, o, 'FULL', 'Names', true);
 
 	// TODO: NoMerge - NOT IMPLEMENTED
 
 	// TAG: Sound
-		if InSignatureList(sig, 'ACTI, CONT, DOOR, LIGH, MGEF, WTHR') then
+		if (sig = 'ACTI') or (sig = 'CONT') or (sig = 'DOOR') or (sig = 'LIGH')
+		or (sig = 'MGEF') or (sig = 'WTHR') then
 			CheckSound(e, o, true);
 
-		if InSignatureList(sig, 'CREA, NPC_') then begin
+		if (sig = 'CREA') or (sig = 'NPC_') then begin
 
 			if (wbGameMode = gmTES4) then begin
 	// TAG: Invent - special handling for CREA and NPC_ record types
@@ -1467,7 +1465,10 @@ begin
 		end;
 
 	// TAG: Stats
-		if InSignatureList(sig, 'ALCH, AMMO, APPA, ARMO, BOOK, CLOT, INGR, KEYM, LIGH, MISC, SGST, SLGM, WEAP') then
+		if (sig = 'ALCH') or (sig = 'AMMO') or (sig = 'APPA') or (sig = 'ARMO')
+		or (sig = 'BOOK') or (sig = 'CLOT') or (sig = 'INGR') or (sig = 'KEYM')
+		or (sig = 'LIGH') or (sig = 'MISC') or (sig = 'SGST') or (sig = 'SLGM')
+		or (sig = 'WEAP') then
 			CheckStats(e, o, true);
 	end; // end game
 end;
