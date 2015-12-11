@@ -1211,7 +1211,7 @@ begin
 		if (sig = 'ACTI') or (sig = 'ALCH') or (sig = 'AMMO') or (sig = 'BOOK')
 		or (sig = 'CONT') or (sig = 'DOOR') or (sig = 'FURN') or (sig = 'IMOD')
 		or (sig = 'KEYM') or (sig = 'MISC') or (sig = 'MSTT') or (sig = 'PROJ')
-		or (sig = 'TACT') or (sig = 'TERM') or (sig = 'WEAP')
+		or (sig = 'TACT') or (sig = 'TERM') or (sig = 'WEAP') then
 			CheckDestructible(e, o, true);
 
 	// TAG: Destructible - special handling for CREA and NPC_ record types
