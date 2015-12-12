@@ -18,9 +18,9 @@ All of my scripts require dubhFunctions, which in turn requires [mteFunctions](h
 
 Automatically add object mod rules to `LegendaryItemQuest [QUST:001CCDA5]` from a delimited text file.
 
-IMPORTANT: You must have the latest build of xEdit and Simple Records must be unchecked in the Options!
+**IMPORTANT: You must have the latest build of xEdit and Simple Records must be unchecked in the Options!**
 
-1. Create a text file with a list of OMOD/FLST pairs formatted like this:
+Before you do anything in xEdit, create a text file with a list of OMOD/FLST pairs formatted like this:
 
 ```
 mod_Legendary_Weapon_Sadistic [OMOD:01000800];LegendaryModRule_AllowedKeywords_WeaponTypeGun [FLST:001CCDA7]
@@ -34,13 +34,14 @@ Or this:
 [OMOD:01000800];[FLST:001EC03A]
 ```
 
-2. Save the text file with the `.csv` extension.
-3. Load the plugins that contain the OMOD records listed in the text file.
-4. Right-click anywhere in the tree control and apply the script.
-5. Select the target plugin from the dropdown menu. This is where your new rules will be written.
-6. Click OK.
-7. Select the rules file you created in steps 1 and 2.
-8. Click Open.
+Save the text file with the `.csv` extension.
+
+1. Load the plugins that contain the OMOD records listed in the text file.
+2. Right-click anywhere in the tree control and apply the script.
+3. Select the target plugin from the dropdown menu. This is where your new rules will be written.
+4. Click OK.
+5. Select the rules file you created.
+6. Click Open.
 
 ### Generate Scrap Recipes for Selected Object Records.pas
 
