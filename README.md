@@ -14,6 +14,32 @@ All of my scripts require dubhFunctions, which in turn requires [mteFunctions](h
 
 ## Fallout 4
 
+### Add Legendary Object Mod Rule.pas
+
+Automatically add object mod rules to `LegendaryItemQuest [QUST:001CCDA5]` from a delimited text file.
+
+1. Create a text file with a list of OMOD/FLST pairs formatted like this:
+
+```
+mod_Legendary_Weapon_Sadistic [OMOD:01000800];LegendaryModRule_AllowedKeywords_WeaponTypeGun [FLST:001CCDA7]
+mod_Legendary_Weapon_Sadistic [OMOD:01000800];LegendaryModRule_AllowedKeywords_WeaponTypeMeleeAndHandToHand [FLST:001EC03A]
+```
+
+Or this:
+
+```
+[OMOD:01000800];[FLST:001CCDA7]
+[OMOD:01000800];[FLST:001EC03A]
+```
+
+2. Save the text file with the `.csv` extension.
+3. Load the plugins that contain the OMOD records listed in the text file.
+4. Right-click anywhere in the tree control and apply the script.
+5. Select the target plugin from the dropdown menu. This is where your new rules will be written.
+6. Click OK.
+7. Select the rules file you created in steps 1 and 2.
+8. Click Open.
+
 ### Generate Scrap Recipes for Selected Object Records.pas
 
 Automatically generate COBJ and FLST records to make any object scrappable.
@@ -27,8 +53,7 @@ Automatically generate COBJ and FLST records to make any object scrappable.
 7. Type the object name using alphanumeric characters. Spaces will be removed. You are advised to use the generic version of an object's Editor ID (e.g., Bramble) for organizational purposes.
 8. Click OK.
 
-If there are no errors, the script will create COBJ and FLST records in the
-target plugin, as well as named overrides of the scrappable object records.
+If there are no errors, the script will create COBJ and FLST records in the target plugin, as well as named overrides of the scrappable object records.
 
 ### Restore Material Swap Fields.pas
 
