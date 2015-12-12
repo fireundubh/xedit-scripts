@@ -14,7 +14,7 @@ All of my scripts require dubhFunctions, which in turn requires [mteFunctions](h
 
 ## Fallout 4
 
-### Add Legendary Object Mod Rule.pas
+### Add Legendary Object Mod Rules.pas
 
 Automatically add object mod rules to `LegendaryItemQuest [QUST:001CCDA5]` from a delimited text file.
 
