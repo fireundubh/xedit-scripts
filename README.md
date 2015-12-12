@@ -18,6 +18,8 @@ All of my scripts require dubhFunctions, which in turn requires [mteFunctions](h
 
 Automatically add object mod rules to `LegendaryItemQuest [QUST:001CCDA5]` from a delimited text file.
 
+IMPORTANT: You must have the latest build of xEdit and Simple Records must be unchecked in the Options!
+
 1. Create a text file with a list of OMOD/FLST pairs formatted like this:
 
 ```
