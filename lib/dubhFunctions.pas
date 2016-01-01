@@ -1,18 +1,133 @@
 unit dubhFunctions;
+
 uses mteFunctions;
 
 // --------------------------------------------------------------------
 // AddMessage
 // --------------------------------------------------------------------
-procedure Log(s: string);
+procedure Log(const s: string);
 begin
 	AddMessage(s);
 end;
 
 // --------------------------------------------------------------------
+// Return the form version as a string
+// --------------------------------------------------------------------
+function FormVersion(x: IInterface): String;
+var
+	v: String;
+begin
+	v := GetElementEditValues(x, 'Record Header\Form Version');
+	if Length(v) = 2 then
+		v := '0' + v;
+	Result := v;
+end;
+
+// --------------------------------------------------------------------
+// A shorter way to replace strings without RegEx
+// --------------------------------------------------------------------
+function StrReplace(this, that, subject: String): String;
+begin
+	Result := StringReplace(subject, this, that, [rfReplaceAll, rfIgnoreCase]);
+end;
+
+// --------------------------------------------------------------------
+// Replace a substring with a RegEx pattern and return the new string
+// --------------------------------------------------------------------
+function RegExReplace(pattern, subject, replacement: String): String;
+var
+	regex: TPerlRegEx;
+	output: String;
+begin
+	regex := TPerlRegEx.Create;
+	try
+		regex.RegEx := pattern;
+		regex.Options := [];
+		regex.Subject := subject;
+		regex.Replacement := replacement;
+		regex.ReplaceAll;
+		output := regex.Subject;
+	finally
+		regex.Free;
+		Result := output;
+	end;
+end;
+
+// --------------------------------------------------------------------
+// Return a substring with a RegEx pattern
+// --------------------------------------------------------------------
+function RegExMatch(pattern, subject: String): String;
+var
+	regex: TPerlRegEx;
+	output: String;
+begin
+	regex := TPerlRegEx.Create;
+	try
+		regex.RegEx := pattern;
+		regex.Options := [];
+		regex.Subject := subject;
+		regex.Match;
+		output := regex.MatchedText;
+	finally
+		regex.Free;
+		Result := output;
+	end;
+end;
+
+// --------------------------------------------------------------------
+// Return whether a string matches a RegEx pattern
+// --------------------------------------------------------------------
+function RegExMatches(pattern, subject: String): Boolean;
+var
+	regex: TPerlRegEx;
+	output: String;
+begin
+	regex := TPerlRegEx.Create;
+	try
+		regex.RegEx := pattern;
+		regex.Options := [];
+		regex.Subject := subject;
+		regex.Match;
+		output := regex.FoundMatch;
+	finally
+		regex.Free;
+		Result := output;
+	end;
+end;
+
+// --------------------------------------------------------------------
+// Apply Markdown formatting to TStringList
+// --------------------------------------------------------------------
+function Markdown(const ls: TStringList; const d: Char; const pre: Boolean): TStringList;
+var
+	mds, mdb, mde, mdd: String;
+	i: Integer;
+	lsmd: TStringList;
+begin
+	if pre then begin
+		mdb := '<pre>';
+		mde := '</pre>';
+		mdd := '</pre> | <pre>';
+	end else begin
+		mdb := '`';
+		mde := '`';
+		mdd := '` | `';
+	end;
+
+	lsmd := TStringList.Create;
+
+	for i := 0 to ls.Count - 1 do begin
+		mds := mdb + StringReplace(ls[i], d, mdd, [rfReplaceAll, rfIgnoreCase]) + mde;
+		lsmd.Add(mds);
+	end;
+
+	Result := lsmd;
+end;
+
+// --------------------------------------------------------------------
 // GetEditValue
 // --------------------------------------------------------------------
-function gev(s: String): String;
+function gev(const s: String): String;
 begin
 	Result := GetEditValue(s);
 end;
@@ -20,15 +135,31 @@ end;
 // --------------------------------------------------------------------
 // SetEditValue
 // --------------------------------------------------------------------
-function sev(x: IInterface; s: String): Integer;
+procedure sev(const x: IInterface; const s: String);
 begin
 	SetEditValue(x, s);
 end;
 
 // --------------------------------------------------------------------
+// GetNativeValue
+// --------------------------------------------------------------------
+function gnv(const x: IInterface): Variant;
+begin
+	Result := GetNativeValue(x);
+end;
+
+// --------------------------------------------------------------------
+// SetNativeValue
+// --------------------------------------------------------------------
+procedure sev(const x: IInterface; const v: Variant);
+begin
+	SetNativeValue(x, v);
+end;
+
+// --------------------------------------------------------------------
 // ElementCount - 1
 // --------------------------------------------------------------------
-function prc(x: IInterface): Integer;
+function PredCount(const x: IInterface): Integer;
 begin
 	Result := Pred(ElementCount(x));
 end;
@@ -36,7 +167,7 @@ end;
 // --------------------------------------------------------------------
 // Lowercases two strings, compares them, and returns value
 // --------------------------------------------------------------------
-function CompareStrLower(s1, s2: String): Integer;
+function CompareStrLower(const s1, s2: String): Integer;
 begin
 	Result := CompareStr(Lowercase(s1), Lowercase(s2));
 end;
@@ -44,7 +175,7 @@ end;
 // --------------------------------------------------------------------
 // Returns true/false if substring is in element's substring
 // --------------------------------------------------------------------
-function HasElementSubstring(s: String; x: IInterface; CaseSensitive: Boolean): Boolean;
+function HasElementSubstring(const s: String; const x: IInterface; const CaseSensitive: Boolean): Boolean;
 begin
 	if not CaseSensitive then
 		if pos(Lowercase(s), Lowercase(GetEditValue(x))) > 0 then
@@ -57,7 +188,7 @@ end;
 // --------------------------------------------------------------------
 // Returns true/false if element is assigned by element's signature
 // --------------------------------------------------------------------
-function AssignedBySignature(x: IInterface; s: String): Boolean;
+function AssignedBySignature(const x: IInterface; const s: String): Boolean;
 begin
 	if Assigned(GetElement(x, s)) then
 		Result := true;
@@ -66,7 +197,7 @@ end;
 // --------------------------------------------------------------------
 // Returns the string of an element by the element's signature
 // --------------------------------------------------------------------
-function ElementStringBySignature(x: IInterface; s: String): String;
+function ElementStringBySignature(const x: IInterface; const s: String): String;
 begin
 	Result := GetEditValue(GetElement(x, s));
 end;
@@ -74,7 +205,7 @@ end;
 // --------------------------------------------------------------------
 // Returns true/false if a string is in a TStringList
 // --------------------------------------------------------------------
-function StringExistsInList(item: String; list: TStringList): Boolean;
+function StringExistsInList(const item: String; const list: TStringList): Boolean;
 begin
 	Result := (list.IndexOf(item) <> -1);
 end;
@@ -82,7 +213,7 @@ end;
 // --------------------------------------------------------------------
 // Returns the string for a condition type
 // --------------------------------------------------------------------
-function GetCondType(val: String): String;
+function ConditionType(const val: String): String;
 var
 	operators: String;
 	a, b, c, d, e: Boolean;
@@ -128,7 +259,7 @@ end;
 // --------------------------------------------------------------------
 // Returns the string of a condition type but with comparison operators
 // --------------------------------------------------------------------
-function GetCondTypeOperator(val: String): String;
+function ConditionOperator(const val: String): String;
 var
 	operators: String;
 	a, b, c, d, e: Boolean;
@@ -175,7 +306,7 @@ end;
 // Returns a localized string as a string from a hexadecimal Form ID
 // Note: Init LocalizationGetStringsFromFile() for performance gain
 // --------------------------------------------------------------------
-function LocalizedStringByFormID(hex: String; sl: TStringList): String;
+function LocalizedStringByFormID(const hex: String; const sl: TStringList): String;
 var
 	idx: Integer;
 begin
@@ -191,42 +322,48 @@ end;
 // --------------------------------------------------------------------
 // Converts a string to a hexadecimal value
 // --------------------------------------------------------------------
-function StringToHex(S: String): string;
+function StringToHex(const s: String): string;
 var
-	I: Integer;
+	i: Integer;
 begin
   Result := '';
-  for I := 1 to length (S) do
-    Result := Result + IntToHex(ord(S[i]), 2);
+  for i := 1 to Length(s) do
+    Result := Result + IntToHex(Ord(s[i]), 2);
 end;
 
 // --------------------------------------------------------------------
 // Converts a hexadecimal value to a string
 // --------------------------------------------------------------------
-function HexToString(H: String): String;
+function HexToString(h: String): String;
 var
-	I: Integer;
+	i, j: Integer;
+	c: Char;
+	s: String;
 begin
   Result := '';
-  for I := 1 to length (H) div 2 do
-    Result := Result + Char(StrToInt('$' + Copy(H, (I-1)*2+1, 2)));
+  for i := 1 to Length(h) div 2 do begin
+  	s := Copy(h, (i-1) * 2+1, 2);
+    j := StrToInt('$' + s);
+    c := Chr(j);
+    Result := Result+c;
+	end;
 end;
 
 // --------------------------------------------------------------------
 // Reverses a byte array and returns a string
 // --------------------------------------------------------------------
-function ReverseHex(const S: String): String;
+function ReverseHex(const s: String): String;
 var
 	i: Integer;
 	slSource, slTarget: TStringList;
 begin
 	slSource := TStringList.Create;
-	slSource.Delimiter := ' ';
+	slSource.Delimiter := #32;
 
 	slTarget := TStringList.Create;
-	slTarget.Delimiter := ' ';
+	slTarget.Delimiter := #32;
 
-	slSource.DelimitedText := S;
+	slSource.DelimitedText := s;
 	for i := slSource.Count - 1 downto 0 do
 		slTarget.Add(slSource[i]);
 
@@ -236,14 +373,14 @@ end;
 // --------------------------------------------------------------------
 // Return the number of times a character occurs in a string
 // --------------------------------------------------------------------
-function NumOfChar(const S: String; const C: Char): Integer;
+function NumOfChar(const s: String; const c: Char): Integer;
 var
   i: Integer;
 begin
 	Result := 0;
-	for i := 1 to Length(S) do
-		if S[i] = C then
-			inc(Result);
+	for i := 1 to Length(s) do
+		if s[i] = c then
+			Inc(Result);
 end;
 
 // --------------------------------------------------------------------
@@ -251,7 +388,7 @@ end;
 // --------------------------------------------------------------------
 function TrimSpaces(const str: String): String;
 begin
-	Result := StringReplace(str, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+	Result := StringReplace(str, #32, '', [rfReplaceAll, rfIgnoreCase]);
 end;
 
 // --------------------------------------------------------------------
@@ -259,13 +396,13 @@ end;
 // --------------------------------------------------------------------
 function TrimDashes(const str: String): String;
 begin
-	Result := StringReplace(str, '-', '', [rfReplaceAll, rfIgnoreCase]);
+	Result := StringReplace(str, #45, '', [rfReplaceAll, rfIgnoreCase]);
 end;
 
 // --------------------------------------------------------------------
 // Returns True if the x signature is in the y list of signatures
 // --------------------------------------------------------------------
-function InStringList(x, y: String): Boolean;
+function InStringList(const x, y: String): Boolean;
 var
 	idx: Integer;
 	l: TStringList;
@@ -280,7 +417,7 @@ end;
 // --------------------------------------------------------------------
 // Returns true if the needle is in the haystack
 // --------------------------------------------------------------------
-function HasString(needle, haystack: String; caseSensitive: Boolean): Boolean;
+function HasString(const needle, haystack: String; const caseSensitive: Boolean): Boolean;
 begin
 	if caseSensitive then
 		if pos(needle, haystack) > 0 then
@@ -294,7 +431,7 @@ end;
 // --------------------------------------------------------------------
 // Returns any element from a string
 // --------------------------------------------------------------------
-function GetElement(x: IInterface; s: String): IInterface;
+function GetElement(const x: IInterface; const s: String): IInterface;
 begin
 	if (pos('[', s) > 0) then
 		Result := ElementByIP(x, s)
@@ -309,9 +446,7 @@ end;
 // --------------------------------------------------------------------
 // Returns a master overriding record. Int parameter should be 1 or 2.
 // --------------------------------------------------------------------
-function GetLastMaster(x: IInterface; i: integer): IInterface;
-function GetLastOverride(x: IInterface; i: integer): IInterface;
-function OverrideMaster(x: IInterface; i: integer): IInterface;
+function OverrideMaster(const x: IInterface; i: integer): IInterface;
 var
 	o: IInterface;
 begin
@@ -326,7 +461,7 @@ end;
 // --------------------------------------------------------------------
 // Returns "NAME/EDID [SIG_:00000000]" as a String
 // --------------------------------------------------------------------
-function SmallNameEx(e: IInterface): string;
+function SmallNameEx(const e: IInterface): string;
 begin
 	if Signature(e) = 'REFR' then
 		Result := GetElementEditValues(e, 'NAME') + ' [' + Signature(e) + ':' + HexFormID(e) + ']'
@@ -338,7 +473,7 @@ end;
 // Returns the sortkey with handling for .nif paths, and unknown/unused
 // 	data. Also uses a better delimiter.
 // --------------------------------------------------------------------
-function SortKeyEx(e: IInterface): string;
+function SortKeyEx(const e: IInterface): string;
 var
 	i: integer;
 begin
@@ -362,7 +497,7 @@ end;
 // --------------------------------------------------------------------
 // Returns values from a text file as a TStringList
 // --------------------------------------------------------------------
-function LoadFromCsv(autoSort: boolean; allowDuplicates: boolean; useDelimiter: boolean; delimiter: string = '='): TStringList;
+function LoadFromCsv(const autoSort, allowDuplicates, useDelimiter: Boolean; const del: String = '='): TStringList;
 var
 	fileObject: TOpenDialog;
 	lsLines: TStringList;
@@ -376,8 +511,10 @@ begin
 		lsLines.Duplicates := dupIgnore;
 
 	if useDelimiter then
-		if delimiter = '' then
-			lsLines.NameValueSeparator := ',';
+		if del = '' then
+			lsLines.NameValueSeparator := #44
+		else
+			lsLines.NameValueSeparator := del;
 
 	fileObject := TOpenDialog.Create(nil);
 
@@ -398,7 +535,7 @@ end;
 // --------------------------------------------------------------------
 // Returns a group by signature, or adds the group if needed
 // --------------------------------------------------------------------
-function AddGroupBySignature(f: IwbFile; s: String): IInterface;
+function AddGroupBySignature(const f: IwbFile; const s: String): IInterface;
 var g: IInterface;
 begin
 	g := GroupBySignature(f, s);
@@ -411,7 +548,7 @@ end;
 // --------------------------------------------------------------------
 // Adds a new record to a group
 // --------------------------------------------------------------------
-function AddNewRecordToGroup(g: IInterface; s: String): IInterface;
+function AddNewRecordToGroup(const g: IInterface; const s: String): IInterface;
 var
 	r: IInterface;
 begin
@@ -425,7 +562,7 @@ end;
 // --------------------------------------------------------------------
 // Returns an element by string, or adds the element if needed
 // --------------------------------------------------------------------
-function AddElementByString(r: IInterface; s: String): IInterface;
+function AddElementByString(const r: IInterface; const s: String): IInterface;
 var
 	e: IInterface;
 begin
@@ -439,7 +576,7 @@ end;
 // --------------------------------------------------------------------
 // Returns an element by string, or adds the element if needed
 // --------------------------------------------------------------------
-function AssignElementByString(r: IInterface; s: String): IInterface;
+function AssignElementByString(const r: IInterface; const s: String): IInterface;
 var
 	e: IInterface;
 begin
@@ -453,7 +590,7 @@ end;
 // --------------------------------------------------------------------
 // Adds a form to a formlist
 // --------------------------------------------------------------------
-procedure AddRecordToFormList(f, r: IInterface);
+procedure AddRecordToFormList(const f, r: IInterface);
 var
 	l: IInterface;
 begin
@@ -464,7 +601,7 @@ end;
 // --------------------------------------------------------------------
 // Copies a record as an override to a file
 // --------------------------------------------------------------------
-procedure AddOverrideToFile(targetFile: IwbFile; rec: IInterface);
+procedure AddOverrideToFile(const targetFile: IwbFile; const rec: IInterface);
 var
 	ovr, ovr_edid, ovr_full: IInterface;
 begin
@@ -473,6 +610,126 @@ begin
 	{FULL} ovr_full := AddElementByString(ovr, 'FULL');
 	SetEditValue(ovr_full, GetEditValue(ovr_edid));
 	// TODO: string fuckery shouldn't be part of the proc, but what the fuck ever
+end;
+
+// --------------------------------------------------------------------
+// Int to Bin
+// --------------------------------------------------------------------
+function IntToBin(value: LongInt; size: Integer): String;
+var
+	i: Integer;
+begin
+	Result := '';
+	for i := size - 1 downto 0 do begin
+		if value and (1 shl i) <> 0 then begin
+			Result := Result + '1';
+		end else begin
+			Result := Result + '0';
+		end;
+	end;
+end;
+
+// --------------------------------------------------------------------
+// Bin to Int
+// --------------------------------------------------------------------
+function BinToInt(value: String): LongInt;
+var
+	i, Size: Integer;
+begin
+	Result := 0;
+	Size := Length (Value);
+	for i := Size downto 1 do begin
+		if Copy (Value, i, 1) = '1' then
+			Result := Result + (1 shl (Size-i));
+	end;
+end;
+
+// --------------------------------------------------------------------
+// Binary representation of float to integer
+// --------------------------------------------------------------------
+function FloatBinToInt(value: String): Real;
+var
+	i, Size: Integer;
+begin
+	Result := 0;
+	Size := Length(Value);
+	for i := Size downto 1 do begin
+		if Copy(Value, i, 1) = '1' then
+			Result := Result + 1 / (1 shl i);
+	end;
+end;
+
+// --------------------------------------------------------------------
+// Hex to Bin
+// --------------------------------------------------------------------
+function HexToBin(h: string): String;
+var
+	box: Array [0..15] of String;
+	i: Integer;
+begin
+	box[0] := '0000';
+	box[1] := '0001';
+	box[2] := '0010';
+	box[3] := '0011';
+	box[4] := '0100';
+	box[5] := '0101';
+	box[6] := '0110';
+	box[7] := '0111';
+	box[8] := '1000';
+	box[9] := '1001';
+	box[10] := '1010';
+	box[11] := '1011';
+	box[12] := '1100';
+	box[13] := '1101';
+	box[14] := '1110';
+	box[15] := '1111';
+
+	for i := Length(h) downto 1 do
+		Result := box[StrToInt('$' + h[i])] + Result;
+end;
+
+// --------------------------------------------------------------------
+// Hex to Float
+// --------------------------------------------------------------------
+function HexToFloat(s: String): Real;
+var
+	b, t: String;
+	e: Integer;
+	f: Real;
+begin
+	b := HexToBin(s);
+	t := Copy(b, 2,8);
+	e := BinToInt(t) - 127;
+	t := Copy(b, 10, 23);
+	f := 1 + FloatBinToInt(t);
+	if (Copy(b, 1,1) = '0') then
+		Result :=  Power(2, e) * f
+	else
+		Result := -Power(2, e) * f;
+end;
+
+// --------------------------------------------------------------------
+// zilav's hex array to string function - thanks!
+// Note: This is safer to use than HexToString()
+// --------------------------------------------------------------------
+function HexArrayToStr(s: string): string;
+var
+  i: integer;
+  c: char;
+  hex: string;
+begin
+  Result := '';
+  i := 1;
+  while i < Length(s) do begin
+    if s <> ' ' then begin
+      c := Chr(StrToInt('$' + Copy(s, i, 2)));
+      if c = #0 then
+        exit;
+      Result := Result + c;
+      i := i + 3;
+    end else
+      i := i + 1;
+  end;
 end;
 
 end.
