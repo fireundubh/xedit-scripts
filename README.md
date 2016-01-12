@@ -70,6 +70,14 @@ An older build of xEdit did not copy over MODS fields when copying records as ne
 
 ## All Games
 
+### Copy VMAD Subrecord by Form ID to Record.pas
+
+Copies a VMAD subrecord from a source record to the selected target records
+
+1. Select the target record(s) to which you want to add a VMAD subrecord.
+2. Right-click your selection and apply the script.
+3. Enter the 8-digit Form ID of the record whose VMAD subrecord you want to copy.
+
 ### Generate Tags for Wrye Bash.pas
 
 Automatically generate tags for Wrye Bash by processing all records in any plugin for all Bethesda Softworks games.
