@@ -16,9 +16,9 @@ end;
 function IsNull(x: Variant): Boolean;
 begin
 	if (DefTypeString(x) = 'dtInteger') and not CanContainFormIDs(x) then
-		Result := (x = 0)
+		Result := (GetNativeValue(x) = 0)
 	else if (DefTypeString(x) = 'dtFloat') and not CanContainFormIDs(x) then
-		Result := (x = 0.0)
+		Result := (GetNativeValue(x) = 0.0)
 	else if CanContainFormIDs(x) then
 		Result := HasString('00000000', GetEditValue(x), False);
 end;
