@@ -75,8 +75,21 @@ function BasePath(x: IInterface): String;
 var
 	sPath: String;
 begin
-	sPath := TrimChar(#32, RegExReplace('\s[-]\s[a-zA-Z0-9 ]+', '', Trim(Path(x))));
-	Result := RegExReplace('^[\\]', '', RegExReplace('^[a-zA-Z0-9]{4}', '', sPath));
+	//sPath := TrimChar(#32, RegExReplace('\s[-]\s[a-zA-Z0-9 ]+', '', Trim(Path(x))));
+	sPath := Path(x);
+	sPath := Trim(sPath);
+	sPath := RegExReplace('\h+[-]\h+[a-zA-Z0-9 ]+', '', sPath);
+	sPath := Trim(sPath);
+	sPath := RegExReplace('^[a-zA-Z0-9]{4}', '', sPath);
+	sPath := Trim(sPath);
+	sPath := RegExReplace('^[\\]', '', sPath);
+	sPath := Trim(sPath);
+	sPath := RegExReplace('\h*[\\]\h+', '\\', sPath);
+	sPath := Trim(sPath);
+	sPath := RegExReplace('\h+[-]$', '', sPath);
+	sPath := Trim(sPath);
+	Result := sPath;
+
 	//Result := TrimChar(#32, RegExReplace('\s[-]\s\w+\s', Trim(Path(x)), ''));
 	//Result := TrimChar(#32, RegExReplace('\b[a-zA-Z0-9]+\b\K\h[-]$|\b[a-zA-Z0-9]+\b\K\h[-](.*)$|\b[a-zA-Z0-9]+\b\K\h[-]\h\b[a-zA-Z0-9]+\b$', TrimRight(Path(x)), '#'));
 end;
@@ -84,9 +97,9 @@ end;
 // --------------------------------------------------------------------
 // A shorter way to replace strings without RegEx
 // --------------------------------------------------------------------
-function StrReplace(this, that, subject: String): String;
+function StrReplace(this, that, subj: String): String;
 begin
-	Result := StringReplace(subject, this, that, [rfReplaceAll, rfIgnoreCase]);
+	Result := StringReplace(subj, this, that, [rfReplaceAll, rfIgnoreCase]);
 end;
 
 function EscapeSlashes(s: String): String;
@@ -138,10 +151,34 @@ begin
 	end;
 end;
 
+function RegExMatchAll(ptrn, subj: String): TStringList;
+var
+	re: TPerlRegEx;
+	output: TStringList;
+	i: Integer;
+begin
+	output := TStringList.Create;
+	re := TPerlRegEx.Create;
+	try
+		re.RegEx := ptrn;
+		re.Options := [];
+		re.Subject := subj;
+		if re.Match then begin
+			output.Add(re.MatchedText);
+			repeat
+				output.Add(re.MatchedText);
+			until not re.MatchAgain;
+		end;
+	finally
+		re.Free;
+		Result := output;
+	end;
+end;
+
 // --------------------------------------------------------------------
 // Return whether a string matches a RegEx pattern
 // --------------------------------------------------------------------
-function RegExMatches(pattern, subject: String): Boolean;
+function RegExMatches(ptrn, subj: String): Boolean;
 var
 	re: TPerlRegEx;
 	output: String;
@@ -150,15 +187,23 @@ begin
 
 	re := TPerlRegEx.Create;
 	try
-		re.RegEx := pattern;
+		re.RegEx := ptrn;
 		re.Options := [];
-		re.Subject := subject;
+		re.Subject := subj;
 		if re.Match then
 			output := re.FoundMatch;
 	finally
 		re.Free;
 		Result := output;
 	end;
+end;
+
+function UnCamelCase(s: String): String;
+var
+	output: String;
+begin
+		output := RegExReplace('(\B[A-Z])', ' $1', s);
+		Result := RegExReplace('(\B[0-9]{2})', ' $1', output);
 end;
 
 // --------------------------------------------------------------------
@@ -280,16 +325,16 @@ begin
 	if GetChar(val, 4) = '1' then d := True; // or
 	if val = '00000000' then e := True;
 	if e then Result := '<>';
-	if a and not b and not c and not d then Result := '==';
-	if b and not a and not c and not d then	Result := '>';
-	if c and not a and not b and not d then	Result := '<';
-	if a and b and not c and not d then	Result := '>=';
-	if a and c and not b and not d then	Result := '<=';
-	if a and d and not b and not c then	Result := '== / Or';
-	if b and d and not a and not c then	Result := '> / Or';
-	if c and d and not a and not b then	Result := '< / Or';
-	if a and b and d and not c then	Result := '>= / Or';
-	if a and c and d and not b then	Result := '<= / Or';
+	if a and not b and not c and not d then Result := '==';		// 1000
+	if b and not a and not c and not d then	Result := '>';		// 0100
+	if c and not a and not b and not d then	Result := '<';		// 0010
+	if a and b and not c and not d then	Result := '>=';				// 1100
+	if a and c and not b and not d then	Result := '<=';				// 1010
+	if a and d and not b and not c then	Result := '== / Or';	// 1001
+	if not a and b and not c and d then	Result := '> / Or';		// 0101
+	if not a and not b and c and d then	Result := '< / Or';		// 0011
+	if a and b and d and not c then	Result := '>= / Or';			// 1101
+	if a and c and d and not b then	Result := '<= / Or';			// 1011
 end;
 
 // --------------------------------------------------------------------
@@ -383,7 +428,27 @@ end;
 // --------------------------------------------------------------------
 function InStringList(const s: String; const l: TStringList): Boolean;
 begin
+	//Log('InStringList returned: ' + BoolToStr(l.IndexOf(s) <> -1));
 	Result := (l.IndexOf(s) <> -1);
+end;
+
+// --------------------------------------------------------------------
+// Returns the number of duplicates of a string in a TStringList
+// --------------------------------------------------------------------
+function CountDuplicatesInTStringList(s: String; l: TStringList): Integer;
+var
+	i, j: Integer;
+begin
+	if not InStringList(s, l) then
+		Result := 0;
+
+	j := 0;
+	for i := 0 to l.Count - 1 do begin
+		if (s = l[i]) then
+			j := j + 1;
+	end;
+
+	Result := j;
 end;
 
 // --------------------------------------------------------------------
@@ -528,6 +593,38 @@ begin
 	end;
 
 	Result := lsLines;
+end;
+
+// --------------------------------------------------------------------
+// Converts a Formlist or Leveled List to a TStringList
+// --------------------------------------------------------------------
+function ListObjectToTStringList(e: IInterface): TStringList;
+var
+	aParent, aChild: IINterface;
+	lsResults: TStringList;
+	i: Integer;
+begin
+	lsResults := TStringList.Create;
+	lsResults.Sorted := False;
+	lsResults.Duplicates := dupAccept;
+
+	aParent := ElementByName(e, 'Leveled List Entries');
+	if not Assigned(aParent) then
+		aParent := ElementByName(e, 'FormIDs');
+
+	if Name(aParent) = 'Leveled List Entries' then begin
+		for i := 0 to ElementCount(aParent) - 1 do begin
+			aChild := ElementBySignature(ElementByIndex(aParent, i), 'LVLO');
+			lsResults.Add(GetEditValue(ElementByIndex(aChild, 0)) + ',' + HexFormID(LinksTo(ElementByIndex(aChild, 2))) + ',' + GetEditValue(ElementByIndex(aChild, 3)));
+		end;
+	end else begin
+		for i := 0 to ElementCount(aParent) - 1 do begin
+			aChild := ElementByIndex(aParent, i);
+			lsResults.Add(GetEditValue(aChild));
+		end;
+	end;
+
+	Result := lsResults;
 end;
 
 // --------------------------------------------------------------------
