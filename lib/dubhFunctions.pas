@@ -469,14 +469,16 @@ end;
 // --------------------------------------------------------------------
 function GetElement(const x: IInterface; const s: String): IInterface;
 begin
-	if Pos('[', s) > 0 then
-		Result := ElementByIP(x, s)
-	else if Pos('\', s) > 0 then
-		Result := ElementByPath(x, s)
-	else if s = Uppercase(s) then
-		Result := ElementBySignature(x, s)
-	else
-		Result := ElementByName(x, s);
+	if Length(s) > 0 then begin
+		if Pos('[', s) > 0 then
+			Result := ElementByIP(x, s)
+		else if Pos('\', s) > 0 then
+			Result := ElementByPath(x, s)
+		else if s = Uppercase(s) then
+			Result := ElementBySignature(x, s)
+		else
+			Result := ElementByName(x, s);
+	end;
 end;
 
 // --------------------------------------------------------------------
