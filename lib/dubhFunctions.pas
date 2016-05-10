@@ -262,7 +262,7 @@ end;
 // --------------------------------------------------------------------
 // SetNativeValue
 // --------------------------------------------------------------------
-procedure sev(const x: IInterface; const v: Variant);
+procedure snv(const x: IInterface; const v: Variant);
 begin
 	SetNativeValue(x, v);
 end;
@@ -493,6 +493,21 @@ begin
 		o := MasterOrSelf(x);
 	if OverrideCount(o) > i - 1 then
 		o := OverrideByIndex(o, OverrideCount(o) - i);
+	Result := o;
+end;
+
+// --------------------------------------------------------------------
+// Returns the last overriding record
+// --------------------------------------------------------------------
+function LastOverride(const x: IInterface): IInterface;
+var
+	o: IInterface;
+begin
+	o := Master(x);
+	if not Assigned(o) then
+		o := MasterOrSelf(x);
+	if OverrideCount(o) > 0 then
+		o := OverrideByIndex(o, OverrideCount(o) - 1);
 	Result := o;
 end;
 
