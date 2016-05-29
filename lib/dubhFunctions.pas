@@ -428,7 +428,6 @@ end;
 // --------------------------------------------------------------------
 function InStringList(const s: String; const l: TStringList): Boolean;
 begin
-	//Log('InStringList returned: ' + BoolToStr(l.IndexOf(s) <> -1));
 	Result := (l.IndexOf(s) <> -1);
 end;
 

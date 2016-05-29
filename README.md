@@ -6,7 +6,7 @@ Other scripts can be found [here](https://drive.google.com/folderview?id=0B0o3cG
 
 ## Libraries
 
-### dubhFunctions.pas
+### `dubhFunctions.pas`
 
 A collection of functions and procedures that make my life easier.
 
@@ -14,7 +14,7 @@ All of my scripts require dubhFunctions, which in turn requires [mteFunctions](h
 
 ## Fallout 4
 
-### Add Legendary Object Mod Rules.pas
+### `Add Legendary Object Mod Rules.pas`
 
 Automatically add object mod rules to `LegendaryItemQuest [QUST:001CCDA5]` from a delimited text file.
 
@@ -43,7 +43,15 @@ Save the text file with the `.csv` extension.
 5. Select the rules file you created.
 6. Click Open.
 
-### Generate Scrap Recipes for Selected Object Records.pas
+### `Generate Loose Mods for Selected OMOD Records.pas`
+
+Automatically generate and assign MISC loose mods for the selected OMOD records.
+
+1. Ensure that the sEditorPrefix is desired.
+2. Select one or many OMOD records, and apply the script.
+3. Select the file where the new MISC records should be saved.
+
+### `Generate Scrap Recipes for Selected Object Records.pas`
 
 Automatically generate COBJ and FLST records to make any object scrappable.
 
@@ -58,7 +66,7 @@ Automatically generate COBJ and FLST records to make any object scrappable.
 
 If there are no errors, the script will create COBJ and FLST records in the target plugin, as well as named overrides of the scrappable object records.
 
-### Restore Material Swap Fields.pas
+### `Restore Material Swap Fields.pas`
 
 An older build of xEdit did not copy over MODS fields when copying records as new or overrides. This script restores those fields, if the Editor IDs of the selected records match the Editor IDs of the source records. If the EDID fields do not match, the MODS fields will have to be restored manually.
 
@@ -70,7 +78,7 @@ An older build of xEdit did not copy over MODS fields when copying records as ne
 
 ## All Games
 
-### Copy VMAD Subrecord by Form ID to Record.pas
+### `Copy VMAD Subrecord by Form ID to Record.pas`
 
 Copies a VMAD subrecord from a source record to the selected target records
 
@@ -78,13 +86,13 @@ Copies a VMAD subrecord from a source record to the selected target records
 2. Right-click your selection and apply the script.
 3. Enter the 8-digit Form ID of the record whose VMAD subrecord you want to copy.
 
-### Generate Tags for Wrye Bash.pas
+### `Generate Tags for Wrye Bash.pas`
 
 Automatically generate tags for Wrye Bash by processing all records in any plugin for all Bethesda Softworks games.
 
 1. Load only the plugin for which you want to generate tags.
 2. Right-click the name of the plugin and apply the script.
-3. Choose Yes, No, or Abort on the subsequent prompt.
+3. Choose Yes, No, or Abort on the subsequent prompts.
 4. Wait until the script finishes executing.
 
 Support for Fallout 4 is not yet implemented.
