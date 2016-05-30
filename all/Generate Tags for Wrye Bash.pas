@@ -1,15 +1,11 @@
 {
-	Purpose: Automatic Bash Tag Generation
+	Purpose: Automatic Bash Tag Generation for Wrye Bash and Mator Smash
 	Games: FO3/FNV/TES4/TES5
 	Author: fireundubh <fireundubh@gmail.com>
-	Version: 1.6
 
-	Description: This script detects up to 58 bash tags in FO3, FNV, TES4, and TES5 plugins.
-	Tags can be automatically added to the Description in the File Header. Wrye Bash/Flash can
-	then use these tags to help you create more intelligent bashed patches.
-
-	Requires mteFunctions:
-	https://github.com/matortheeternal/TES5EditScripts/blob/master/trunk/Edit%20Scripts/mteFunctions.pas
+	Requirements:
+	- https://github.com/fireundubh/xedit/blob/master/lib/dubhFunctions.pas
+	- https://github.com/matortheeternal/TES5EditScripts/blob/master/trunk/Edit%20Scripts/mteFunctions.pas
 }
 
 unit BashTagsDetector;
@@ -17,16 +13,578 @@ unit BashTagsDetector;
 uses dubhFunctions;
 
 var
-	f: IwbFile;
-	lsTags, lsLog: TStringList;
-	fn, sTag, game: String;
+	kFile: IwbFile;
+	lsLog, lsSuggestedTags: TStringList;
+	sFileName, sTag, sScriptName, sScriptVersion, sScriptAuthor, sScriptEmail: String;
 	optionAddTags, optionOutputLog: Integer;
 	bDebug: Boolean;
 
-// ******************************************************************
-// FUNCTIONS
-// ******************************************************************
+function Initialize: Integer;
+begin
+	sScriptName    := 'Tag Generator'; // working name
+	sScriptVersion := '1.6.1.0';
+	sScriptAuthor  := 'fireundubh';
+	sScriptEmail   := 'fireundubh@gmail.com';
 
+	// clear
+	ClearMessages();
+
+	// show script header
+	AddMessage(sScriptName + ' v' + sScriptVersion + ' by ' + sScriptAuthor + ' <' + sScriptEmail + '>');
+
+	// prompt to write tags to file header
+	optionAddTags := MessageDlg('Do you want to add suggested tags to the file header?', mtConfirmation, [mbYes, mbNo, mbAbort], 0);
+	if optionAddTags = mrAbort then
+		exit;
+
+	optionOutputLog := MessageDlg('Do you want a log of successful bash tag tests?', mtConfirmation, [mbYes, mbNo, mbAbort], 0);
+	if optionOutputLog = mrAbort then
+		exit;
+
+	// create list of log entries
+	lsLog := TStringList.Create;
+	lsLog.Sorted := False;
+	lsLog.Duplicates := dupAccept;
+
+	// create list of tags
+	lsSuggestedTags := TStringList.Create;
+	lsSuggestedTags.Sorted := True;
+	lsSuggestedTags.Duplicates := dupIgnore;
+	lsSuggestedTags.Delimiter := ','; // separated by comma
+
+	Separator(True);
+
+	if wbGameMode = gmFO3 then
+		AddMessage('Using record structure for Fallout 3');
+	if wbGameMode = gmFNV then
+		AddMessage('Using record structure for Fallout: New Vegas');
+	if wbGameMode = gmTES4 then
+		AddMessage('Using record structure for The Elder Scrolls IV: Oblivion');
+	if wbGameMode = gmTES5 then
+		AddMessage('Using record structure for The Elder Scrolls V: Skyrim');
+
+	Separator(False);
+end;
+
+function Process(e: IInterface): Integer;
+var
+	o: IInterface;
+	sElement, sTag, sSignature: String;
+	ConflictState: TConflictThis;
+	bRunOnce: Boolean;
+	i, iFormID: Integer;
+begin
+	bRunOnce := False;
+
+	// exit conditions
+	ConflictState := ConflictAllForMainRecord(e);
+
+	// get record signature
+	sSignature := Signature(e);
+
+	if (optionAddTags = mrAbort)
+	or (optionOutputLog = mrAbort)
+	or (sSignature = 'TES4')
+	or (ConflictState = caUnknown)
+	or (ConflictState = caOnlyOne)
+	or (ConflictState = caNoConflict) then
+		exit;
+
+	// get file and file name
+	if not bRunOnce then
+	begin
+		kFile := GetFile(e);
+		sFileName := GetFileName(kFile);
+		bRunOnce := True;
+	end;
+
+	// exit if the record should not be processed
+	if (sFileName = 'Dawnguard.esm') then
+	begin
+		iFormID := FileFormID(e);
+		if (iFormID = $00016BCF)
+		or (iFormID = $0001EE6D)
+		or (iFormID = $0001FA4C)
+		or (iFormID = $00039F67)
+		or (iFormID = $0006C3B6) then
+			exit;
+	end;
+
+	// get master record
+	o := Master(e);
+
+	// exit if the override does not exist
+	if not Assigned(o) then
+		exit;
+
+	// if record overrides several masters, then get the last one
+	if OverrideCount(o) > 1 then
+		o := OverrideByIndex(o, OverrideCount(o) - 2);
+
+	// stop processing deleted records to avoid errors
+	if GetIsDeleted(e)
+	or GetIsDeleted(o) then
+		exit;
+
+	sElement := 'ACBS\Template Flags';
+
+	// -------------------------------------------------------------------------------
+	// GROUP: Supported tags exclusive to FNV
+	// -------------------------------------------------------------------------------
+	if wbGameMode = gmFNV then
+		if sSignature = 'WEAP' then
+			ProcessTag('WeaponMods', e, o);
+
+	// -------------------------------------------------------------------------------
+	// GROUP: Supported tags exclusive to TES4
+	// -------------------------------------------------------------------------------
+	if wbGameMode = gmTES4 then
+	begin
+		if (sSignature = 'CREA')
+		or (sSignature = 'NPC_') then
+		begin
+			ProcessTag('Actors.Spells', e, o);
+
+			if sSignature = 'CREA' then
+				ProcessTag('Creatures.Blood', e, o);
+		end;
+
+		// TODO: Npc.EyesOnly - NOT IMPLEMENTED
+		// TODO: Npc.HairOnly - NOT IMPLEMENTED
+		// TODO: R.AddSpells - NOT IMPLEMENTED
+
+		if sSignature = 'RACE' then
+		begin
+			ProcessTag('R.ChangeSpells', e, o);
+			ProcessTag('R.Attributes-F', e, o);
+			ProcessTag('R.Attributes-M', e, o);
+		end;
+
+		if sSignature = 'ROAD' then
+			ProcessTag('Roads', e, o);
+
+		if sSignature = 'SPEL' then
+			ProcessTag('SpellStats', e, o);
+	end;
+
+	// -------------------------------------------------------------------------------
+	// GROUP: Supported tags exclusive to TES5
+	// -------------------------------------------------------------------------------
+	if wbGameMode = gmTES5 then
+		if sSignature = 'CELL' then
+		begin
+			ProcessTag('C.Location', e, o);
+			ProcessTag('C.Regions', e, o);
+			ProcessTag('C.SkyLighting', e, o);
+		end;
+
+	// -------------------------------------------------------------------------------
+	// GROUP: Supported tags exclusive to FO3 and FNV
+	// -------------------------------------------------------------------------------
+	if (wbGameMode = gmFO3)
+	or (wbGameMode = gmFNV) then
+	begin
+		sTag := 'Destructible';
+		if (sSignature = 'ACTI')
+		or (sSignature = 'ALCH')
+		or (sSignature = 'AMMO')
+		or (sSignature = 'BOOK')
+		or (sSignature = 'CONT')
+		or (sSignature = 'DOOR')
+		or (sSignature = 'FURN')
+		or (sSignature = 'IMOD')
+		or (sSignature = 'KEYM')
+		or (sSignature = 'MISC')
+		or (sSignature = 'MSTT')
+		or (sSignature = 'PROJ')
+		or (sSignature = 'TACT')
+		or (sSignature = 'TERM')
+		or (sSignature = 'WEAP') then
+			ProcessTag(sTag, e, o);
+
+		// special handling for CREA and NPC_ record types
+		if (sSignature = 'CREA')
+		or (sSignature = 'NPC_') then
+			if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+				ProcessTag(sTag, e, o);
+	end;
+
+	// -------------------------------------------------------------------------------
+	// GROUP: Supported tags exclusive to FO3, FNV, and TES4
+	// -------------------------------------------------------------------------------
+	if (wbGameMode = gmFO3)
+	or (wbGameMode = gmFNV)
+	or (wbGameMode = gmTES4) then
+	begin
+		if (sSignature = 'CREA')
+		or (sSignature = 'NPC_') then
+		begin
+			sTag := 'Factions';
+			if wbGameMode = gmTES4 then
+				ProcessTag(sTag, e, o);
+			else
+				if not CompareFlags(sTag, e, o, sElement, 'Use Factions', False, False) then
+					ProcessTag(sTag, e, o);
+		end;
+
+		if sSignature = 'FACT' then
+			ProcessTag('Relations', e, o);
+	end;
+
+	// -------------------------------------------------------------------------------
+	// GROUP: Supported tags exclusive to FO3, FNV, and TES5
+	// -------------------------------------------------------------------------------
+	if (wbGameMode = gmFO3)
+	or (wbGameMode = gmFNV)
+	or (wbGameMode = gmTES5) then
+	begin
+		if (sSignature = 'CREA')
+		or (sSignature = 'NPC_') then
+		begin
+			sTag := 'Actors.ACBS';
+			if not CompareFlags(sTag, e, o, sElement, 'Use Stats', False, False) then
+				ProcessTag(sTag, e, o);
+
+			sTag := 'Actors.AIData';
+			if not CompareFlags(sTag, e, o, sElement, 'Use AI Data', False, False) then
+				ProcessTag(sTag, e, o);
+
+			sTag := 'Actors.AIPackages';
+			if not CompareFlags(sTag, e, o, sElement, 'Use AI Packages', False, False) then
+				ProcessTag(sTag, e, o);
+
+			if sSignature = 'CREA' then
+				if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+					ProcessTag('Actors.Anims', e, o);
+
+			if not CompareFlags(sTag, e, o, sElement, 'Use Traits', False, False) then
+			begin
+				ProcessTag('Actors.CombatStyle', e, o);
+				ProcessTag('Actors.DeathItem', e, o);
+			end;
+
+			sTag := 'Actors.Skeleton';
+			if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+				ProcessTag(sTag, e, o);
+
+			sTag := 'Actors.Stats';
+			if not CompareFlags(sTag, e, o, sElement, 'Use Stats', False, False) then
+				ProcessTag(sTag, e, o);
+
+			// TODO: IIM - NOT IMPLEMENTED
+			// TODO: MustBeActiveIfImported - NOT IMPLEMENTED
+
+			if sSignature = 'NPC_' then
+			begin
+				sTag := 'NPC.Class';
+				if not CompareFlags(sTag, e, o, sElement, 'Use Traits', False, False) then
+					ProcessTag(sTag, e, o);
+
+				sTag := 'NPC.Race';
+				if not CompareFlags(sTag, e, o, sElement, 'Use Traits', False, False) then
+					ProcessTag(sTag, e, o);
+
+				sTag := 'NpcFaces';
+				if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+					ProcessTag(sTag, e, o);
+			end;
+
+			sTag := 'Scripts';
+			if not CompareFlags(sTag, e, o, sElement, 'Use Script', False, False) then
+				ProcessTag(sTag, e, o);
+		end;
+
+		if sSignature = 'CELL' then
+		begin
+			ProcessTag('C.Acoustic', e, o);
+			ProcessTag('C.Encounter', e, o);
+			ProcessTag('C.ImageSpace', e, o);
+		end;
+
+		if sSignature = 'RACE' then
+		begin
+			ProcessTag('Body-F', e, o);
+			ProcessTag('Body-M', e, o);
+			ProcessTag('Body-Size-F', e, o);
+			ProcessTag('Body-Size-M', e, o);
+			ProcessTag('Eyes', e, o);
+			ProcessTag('Hair', e, o);
+			ProcessTag('R.Description', e, o);
+			ProcessTag('R.Ears', e, o);
+			ProcessTag('R.Head', e, o);
+			ProcessTag('R.Mouth', e, o);
+			ProcessTag('R.Relations', e, o);
+			ProcessTag('R.Skills', e, o);
+			ProcessTag('R.Teeth', e, o);
+			ProcessTag('Voice-F', e, o);
+			ProcessTag('Voice-M', e, o);
+		end;
+
+		// TODO: ScriptContents - SHOULD NOT BE IMPLEMENTED
+		// -- According to the Wrye Bash Readme: "Should not be used. Can cause serious issues."
+
+		if (sSignature = 'ACTI')
+		or (sSignature = 'ALCH')
+		or (sSignature = 'ARMO')
+		or (sSignature = 'CONT')
+		or (sSignature = 'DOOR')
+		or (sSignature = 'FLOR')
+		or (sSignature = 'FURN')
+		or (sSignature = 'INGR')
+		or (sSignature = 'KEYM')
+		or (sSignature = 'LIGH')
+		or (sSignature = 'LVLC')
+		or (sSignature = 'MISC')
+		or (sSignature = 'QUST')
+		or (sSignature = 'WEAP') then
+			ProcessTag('Scripts', e, o);
+	end;
+
+	// -------------------------------------------------------------------------------
+	// GROUP: Supported tags exclusive to FO3, FNV, TES4, and TES5
+	// -------------------------------------------------------------------------------
+	if (wbGameMode = gmFO3)
+	or (wbGameMode = gmFNV)
+	or (wbGameMode = gmTES4)
+	or (wbGameMode = gmTES5) then
+	begin
+		if (sSignature = 'CELL') then
+		begin
+			ProcessTag('C.Climate', e, o);
+			ProcessTag('C.Light', e, o);
+			ProcessTag('C.Music', e, o);
+			ProcessTag('C.Name', e, o);
+			ProcessTag('C.Owner', e, o);
+			ProcessTag('C.RecordFlags', e, o);
+			ProcessTag('C.Water', e, o);
+		end;
+
+		// TODO: Deactivate - NOT IMPLEMENTED
+
+		// TAG: Delev, Relev
+		if (sSignature = 'LVLC')
+		or (sSignature = 'LVLI')
+		or (sSignature = 'LVLN')
+		or (sSignature = 'LVSP') then
+			ProcessDelevRelevTags(e, o);
+
+		// TODO: Filter - NOT IMPLEMENTED
+
+		if (sSignature = 'ACTI')
+		or (sSignature = 'ALCH')
+		or (sSignature = 'AMMO')
+		or (sSignature = 'APPA')
+		or (sSignature = 'ARMO')
+		or (sSignature = 'BOOK')
+		or (sSignature = 'BSGN')
+		or (sSignature = 'CLAS')
+		or (sSignature = 'CLOT')
+		or (sSignature = 'DOOR')
+		or (sSignature = 'FLOR')
+		or (sSignature = 'FURN')
+		or (sSignature = 'INGR')
+		or (sSignature = 'KEYM')
+		or (sSignature = 'LIGH')
+		or (sSignature = 'MGEF')
+		or (sSignature = 'MISC')
+		or (sSignature = 'SGST')
+		or (sSignature = 'SLGM')
+		or (sSignature = 'WEAP') then
+		begin
+			ProcessTag('Graphics', e, o);
+			ProcessTag('Names', e, o);
+			ProcessTag('Stats', e, o);
+
+			if (sSignature = 'ACTI')
+			or (sSignature = 'DOOR')
+			or (sSignature = 'LIGH')
+			or (sSignature = 'MGEF') then
+				ProcessTag('Sound', e, o);
+		end;
+
+
+		if (sSignature = 'CREA')
+		or (sSignature = 'EFSH')
+		or (sSignature = 'GRAS')
+		or (sSignature = 'LSCR')
+		or (sSignature = 'LTEX')
+		or (sSignature = 'REGN')
+		or (sSignature = 'STAT')
+		or (sSignature = 'TREE') then
+			ProcessTag('Graphics', e, o);
+
+		if sSignature = 'CONT' then
+		begin
+			ProcessTag('Invent', e, o);
+			ProcessTag('Names', e, o);
+			ProcessTag('Sound', e, o);
+		end;
+
+		if (sSignature = 'DIAL')
+		or (sSignature = 'ENCH')
+		or (sSignature = 'EYES')
+		or (sSignature = 'FACT')
+		or (sSignature = 'HAIR')
+		or (sSignature = 'QUST')
+		or (sSignature = 'RACE')
+		or (sSignature = 'SPEL')
+		or (sSignature = 'WRLD') then
+			ProcessTag('Names', e, o);
+
+		// TODO: NoMerge - NOT IMPLEMENTED
+
+		if (sSignature = 'WTHR') then
+			ProcessTag('Sound', e, o);
+
+		// special handling for CREA and NPC_
+		if (sSignature = 'CREA')
+		or (sSignature = 'NPC_') then
+		begin
+			if wbGameMode = gmTES4 then
+			begin
+				ProcessTag('Invent', e, o);
+				ProcessTag('Names', e, o);
+
+				if sSignature = 'CREA' then
+					ProcessTag('Sound', e, o);
+
+			end;
+
+			if wbGameMode <> gmTES4 then
+			begin
+				sTag := 'Invent';
+				if not CompareFlags(sTag, e, o, sElement, 'Use Inventory', False, False) then
+					ProcessTag(sTag, e, o);
+
+				// special handling for CREA and NPC_ record types
+				sTag := 'Names';
+				if not CompareFlags(sTag, e, o, sElement, 'Use Base Data', False, False) then
+					ProcessTag(sTag, e, o);
+
+				// special handling for CREA record type
+				sTag := 'Sound';
+				if sSignature = 'CREA' then
+					if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+						ProcessTag(sTag, e, o);
+			end;
+		end;
+
+
+	end;
+end;
+
+function Finalize: Integer;
+var
+	kHeader, kDescription: IInterface;
+	lsExistingTags, lsDifferentTags, lsBadTags: TSTringList;
+	sDescription: String;
+begin
+	lsExistingTags := TStringList.Create; // existing tags
+	lsDifferentTags := TStringList.Create; // different tags
+	lsBadTags := TStringList.Create; // bad tags
+
+	// exit conditions
+	if (optionAddTags = mrAbort)
+	or (optionOutputLog = mrAbort)
+	or not Assigned(lsSuggestedTags)
+	or not Assigned(sFileName) then
+		exit;
+
+	// output file name
+	AddMessage(Uppercase(sFileName));
+
+	// output log
+	if optionOutputLog = mrYes then
+		if lsLog.Count > 0 then
+		begin
+			Separator(False);
+			AddMessage(lsLog.Text);
+		end;
+
+	// if any suggested tags were generated
+	if lsSuggestedTags.Count > 0 then
+	begin
+		kHeader := ElementBySignature(kFile, 'TES4');
+
+		// determine if the header record exists
+		if Assigned(kHeader) then
+		begin
+			kDescription := ElementBySignature(kHeader, 'SNAM');
+			sDescription := GetEditValue(kDescription);
+
+			// categorize tag list
+			lsExistingTags.CommaText := Substring(sDescription, '{{BASH:', '}}');
+			lsDifferentTags := Diff(lsSuggestedTags, lsExistingTags);
+			lsBadTags := Diff(lsExistingTags, lsSuggestedTags);
+			lsSuggestedTags.AddStrings(lsDifferentTags);
+
+			// exit if existing and suggested tags are the same
+			if SameText(lsExistingTags.CommaText, lsSuggestedTags.CommaText) then
+			begin
+				Separator(False);
+				FormatTags(lsExistingTags, 'existing tag found:', 'existing tags found:', 'No existing tags found.');
+				FormatTags(lsSuggestedTags, 'suggested tag:', 'suggested tags:', 'No suggested tags.');
+				AddMessage('No tags to add.' + #13#10);
+				Separator(False);
+				exit;
+			end;
+
+		// exit if the header record doesn't exist
+		end else begin
+			Separator(False);
+			AddMessage('Header record not found. Nothing to do. Exiting.' + #13#10);
+			Separator(False);
+			exit;
+		end;
+
+		// write tags
+		if optionAddTags = mrYes then
+		begin
+			// if the description element doesn't exist, add the element
+			kDescription := AddElementByString(kHeader, 'SNAM');
+
+			if not SameText(lsExistingTags.CommaText, lsSuggestedTags.CommaText) then
+			begin
+				sDescription := GetEditValue(kDescription);
+				sDescription := Trim(RemoveFromEnd(sDescription, Format('{{BASH:%s}}', [lsExistingTags.DelimitedText])));
+				SetEditValue(kDescription, sDescription + #13#10 + #13#10 + Format('{{BASH:%s}}', [lsSuggestedTags.DelimitedText]));
+			end;
+
+			Separator(False);
+			FormatTags(lsBadTags, 'bad tag removed:', 'bad tags removed:', 'No bad tags found.');
+			FormatTags(lsDifferentTags, 'tag added to file header:', 'tags added to file header:', 'No tags added.');
+			Separator(False)
+		end;
+
+		// suggest tags only and output to log
+		if optionAddTags = mrNo then
+		begin
+			Separator(False);
+			FormatTags(lsExistingTags, 'existing tag found:', 'existing tags found:', 'No existing tags found.');
+			FormatTags(lsBadTags, 'bad tag found:', 'bad tags found:', 'No bad tags found.');
+			FormatTags(lsDifferentTags, 'suggested tag to add:', 'suggested tags to add:', 'No suggested tags to add.');
+			FormatTags(lsSuggestedTags, 'suggested tag overall:', 'suggested tags overall:', 'No suggested tags overall.');
+			Separator(False)
+		end;
+	end;
+
+	FreeAndNil(lsLog);
+	FreeAndNil(lsSuggestedTags);
+	FreeAndNil(lsExistingTags);
+	FreeAndNil(lsDifferentTags);
+	FreeAndNil(lsBadTags);
+end;
+
+function StrToBool(s: String): Boolean;
+begin
+	if (s <> '0') and (s <> '1') then
+		Result := nil
+	else
+		if (s = '1') then
+			Result := True
+		else
+			Result := False;
+end;
 
 function CompareAssignment(asTag: String; e, m: IInterface): Boolean;
 var
@@ -46,7 +604,8 @@ begin
 
 	if bAssignedE <> bAssignedM then
 	begin
-		AddLogEntry(asTag, '[Assigned]', e, m);
+		if optionOutputLog = mrYes then
+			AddLogEntry(asTag, '[Assigned]', e, m);
 		AddTag(asTag);
 		Result := True;
 	end;
@@ -69,7 +628,8 @@ begin
 
 	if iCountE <> iCountM then
 	begin
-		AddLogEntry(asTag, '[ElementCount]', e, m);
+		if optionOutputLog = mrYes then
+			AddLogEntry(asTag, '[ElementCount]', e, m);
 		AddTag(asTag);
 		Result := True;
 	end;
@@ -84,26 +644,25 @@ begin
 
 	Result := False;
 
-	sValueE := Lowercase(GetEditValue(e));
-	sValueM := Lowercase(GetEditValue(m));
+	sValueE := GetEditValue(e);
+	sValueM := GetEditValue(m);
 
-	if sValueE = sValueM then
+	if SameText(sValueE, sValueM) then
 		exit;
 
-	if sValueE <> sValueM then
+	if not SameText(sValueE, sValueM) then
 	begin
-		AddLogEntry(asTag, '[GetEditValue]', e, m);
+		if optionOutputLog = mrYes then
+			AddLogEntry(asTag, '[GetEditValue]', e, m);
 		AddTag(asTag);
 		Result := True;
 	end;
 end;
 
-// ----------------------------------------------------------------------------
-// Returns True if any two flags are different or set, and False if not
-// ----------------------------------------------------------------------------
 function CompareFlags(asTag: String; e, m: IInterface; sPath, sFlagName: String; bAddTag, bOperation: Boolean): Boolean;
 var
-	x, y: IInterface;
+	x, y, a, b: IInterface;
+	sa, sb, sTestName: String;
 	bResult: Boolean;
 begin
 	if TagExists(asTag) then
@@ -111,34 +670,38 @@ begin
 
 	Result := False;
 
-	x := GetElement(e, sPath);
-	y := GetElement(m, sPath);
+	// flags arrays
+	x := ElementByPath(e, sPath);
+	y := ElementByPath(m, sPath);
 
-	// TRUE: Behave Like Exterior, Use Sky Lighting, Has Water
+	// individual flags
+	a := ElementByName(x, sFlagName);
+	b := ElementByName(y, sFlagName);
+
+	// individual flag edit values
+	sa := GetEditValue(a);
+	sb := GetEditValue(b);
+
 	if bOperation then
-	begin
-		bResult := HasFlag(x, sFlagName) <> HasFlag(y, sFlagName);
-		if bAddTag and bResult then
-			AddLogEntry(asTag, '[CompareFlags:NOT]', x, y);
-	end;
-
-	// FALSE: everywhere else
-	if not bOperation then
-	begin
-		bResult := HasFlag(x, sFlagName) or HasFlag(y, sFlagName);
-		if bAddTag and bResult then
-			AddLogEntry(asTag, '[CompareFlags:OR]', x, y);
-	end;
+		bResult := not SameText(sa, sb)  // only used for Behave Like Exterior, Use Sky Lighting, and Has Water
+	else
+		bResult := StrToBool(sa) or StrToBool(sb);
 
 	if bAddTag and bResult then
+	begin
+		if bOperation then
+			sTestName := '[CompareFlags:NOT]'
+		else
+			sTestName := '[CompareFlags:OR]';
+
+		if optionOutputLog = mrYes then
+			AddLogEntry(asTag, sTestName, x, y);
 		AddTag(asTag);
+	end;
 
 	Result := bResult;
 end;
 
-// ----------------------------------------------------------------------------
-// Returns True if the set flags are different and False if not
-// ----------------------------------------------------------------------------
 function CompareKeys(asTag: String; e, m: IInterface): Boolean;
 var
 	bResult: Boolean;
@@ -157,26 +720,24 @@ begin
 	or (ConflictState = caNoConflict) then
 		exit;
 
-	sKeyE := Lowercase(SortKeyEx(e));
-	sKeyM := Lowercase(SortKeyEx(m));
+	sKeyE := SortKeyEx(e);
+	sKeyM := SortKeyEx(m);
 
 	// empty check
 	if (IsEmptyKey(sKeyE) and IsEmptyKey(sKeyM))
-	or (sKeyE = sKeyM) then
+	or SameText(sKeyE, sKeyM) then
 		exit;
 
 	// case sensitive comparison
-	if sKeyE <> sKeyM then
+	if not SameText(sKeyE, sKeyM) then
 	begin
-		AddLogEntry(asTag, '[CompareKeys]', e, m);
+		if optionOutputLog = mrYes then
+			AddLogEntry(asTag, '[CompareKeys]', e, m);
 		AddTag(asTag);
 		Result := True;
 	end;
 end;
 
-// ----------------------------------------------------------------------------
-// Returns True if the native values are different and False if not
-// ----------------------------------------------------------------------------
 function CompareNativeValues(asTag: String; e, m: IInterface; asPath: String): Boolean;
 var
 	x, y: IInterface;
@@ -186,23 +747,21 @@ begin
 
 	Result := False;
 
-	x := GetElement(e, asPath);
-	y := GetElement(m, asPath);
+	x := ElementByPath(e, asPath);
+	y := ElementByPath(m, asPath);
 
 	if GetNativeValue(x) = GetNativeValue(y) then
 		exit;
 
 	if GetNativeValue(x) <> GetNativeValue(y) then
 	begin
-		AddLogEntry(asTag, '[CompareNativeValues]', e, m);
+		if optionOutputLog = mrYes then
+			AddLogEntry(asTag, '[CompareNativeValues]', e, m);
 		AddTag(asTag);
 		Result := True;
 	end;
 end;
 
-// ----------------------------------------------------------------------------
-// Get element from list by some value
-// ----------------------------------------------------------------------------
 function SortedArrayElementByValue(e: IInterface; sPath, sValue: String): IInterface;
 var
 	i: Integer;
@@ -212,7 +771,7 @@ begin
 	for i := 0 to ElementCount(e) - 1 do
 	begin
 		kEntry := ElementByIndex(e, i);
-		if GetElementEditValues(kEntry, sPath) = sValue then
+		if SameText(GetElementEditValues(kEntry, sPath), sValue) then
 		begin
 			Result := kEntry;
 			exit;
@@ -220,9 +779,6 @@ begin
 	end;
 end;
 
-// ----------------------------------------------------------------------------
-// Retrieve a string between two expressions
-// ----------------------------------------------------------------------------
 function Substring(sSubstring, sExpression1, sExpression2: String): String;
 var
 	pos1, pos2, len: Integer;
@@ -233,63 +789,19 @@ begin
   Result := Copy(sSubstring, pos1, len);
 end;
 
-// ----------------------------------------------------------------------------
-// Generate a list from the differences between list1 and list2
-// -- list1: existing tags, for example
-// -- list2: suggested tags, for example
-// ----------------------------------------------------------------------------
-function Diff(lsExistingTags, lsSuggestedTags: TStringList): String;
+function Diff(lsList1, lsList2: TStringList): TStringList;
 var
-	i, j: Integer;
-begin
-	for i := lsExistingTags.Count - 1 downto 0 do
-		for j := lsSuggestedTags.Count - 1 downto 0 do
-			if lsSuggestedTags[j] = lsExistingTags[i] then
-				lsSuggestedTags.Delete(j);
-
-	Result := lsSuggestedTags.CommaText;
-end;
-
-// ----------------------------------------------------------------------------
-// Return True if specific flag is set and False if not
-// ----------------------------------------------------------------------------
-function HasFlag(f: IInterface; asFlagName: String): Boolean;
-var
-	flags, templateFlags, cellFlags, recordFlags: TStringList;
 	i: Integer;
+	tmp: TStringList;
 begin
-	// create flag lists
-	flags := TStringList.Create;
-	templateFlags := TStringList.Create;
-	cellFlags := TStringList.Create;
-	recordFlags := TStringList.Create;
-
-	// assign flag lists
-	templateFlags.DelimitedText := '"Use Traits=1", "Use Stats=2", "Use Factions=4", "Use Spell List=8", "Use Actor Effect List=8", "Use AI Data=16", "Use AI Packages=32", "Use Model/Animation=64", "Use Base Data=128", "Use Inventory=256", "Use Script=512", "Use Def Pack List=1024", "Use Attack Data=2048", "Use Keywords=4096"';
-	cellFlags.DelimitedText := '"Is Interior Cell=1", "Has Water=2", "Behave Like Exterior=128", "Use Sky Lighting=256"';
-	recordFlags.DelimitedText := '"ESM=1", "Deleted=32", "Border Region=64", "Turn Off Fire=128", "Casts Shadows=512", "Persistent Reference=1024", "Initially Disabled=2048", "Ignored=4096", "Visible When Distant=32768", "Dangerous=131072", "Compressed=262144", "Cant Wait=524288"';
-
-	// merge flag lists
-	flags.AddStrings(templateFlags);
-	flags.AddStrings(cellFlags);
-	flags.AddStrings(recordFlags);
-
-	// find index
-	i := StrToInt(Lowercase(flags.Values[asFlagName]));
-
-	// free flag lists
-	flags.Free;
-	templateFlags.Free;
-	cellFlags.Free;
-	recordFlags.Free;
-
-	// return result
-	Result := (GetNativeValue(f) and i > 0);
+	tmp := TStringList.Create;
+	for i := 0 to lsList1.Count - 1 do
+		if lsList2.IndexOf(lsList1[i]) < 0 then
+			tmp.Add(lsList1[i]);
+	Result := tmp;
 end;
 
-// ----------------------------------------------------------------------------
-// Returns True if the string contains only zeroes and False if not
-// ----------------------------------------------------------------------------
+// TODO: speed this up!
 function IsEmptyKey(asSortKey: String): Boolean;
 var
 	i: Integer;
@@ -305,9 +817,6 @@ begin
 	end;
 end;
 
-// ----------------------------------------------------------------------------
-// Output bad tag messages to log
-// ----------------------------------------------------------------------------
 function FormatTags(lsTags: TStringList; asSingular, asPlural, asNull: String): Integer;
 begin
 	if (lsTags.Count = 1) then
@@ -334,44 +843,22 @@ begin
 	AddMessage(sLine);
 end;
 
-// ----------------------------------------------------------------------------
-// Check if the tag already exists
-// ----------------------------------------------------------------------------
 function TagExists(asTag: String): Boolean;
 begin
-	Result := (lsTags.IndexOf(asTag) <> -1);
+	Result := (lsSuggestedTags.IndexOf(asTag) <> -1);
 end;
 
-// ******************************************************************
-// PROCEDURES
-// ******************************************************************
-
-// ----------------------------------------------------------------------------
-// Add the tag if the tag does not exist
-// ----------------------------------------------------------------------------
 procedure AddTag(asTag: String);
 begin
 	if not TagExists(asTag) then
-		lsTags.Add(asTag);
+		lsSuggestedTags.Add(asTag);
 end;
 
-// ----------------------------------------------------------------------------
-// Evaluate
-// Determines whether two elements are different and suggests tags
-// Not to be used when you need to know how two elements differ
-// ----------------------------------------------------------------------------
 procedure Evaluate(asTag: String; e, m: IInterface);
 begin
-	// do not try to evaluate nothing
-	{if Length(DefTypeString(e)) = 0 then
-		exit;}
-
 	// exit if the tag already exists
 	if TagExists(asTag) then
 		exit;
-
-	// exit if element is unknown or a flags element
-	// removed
 
 	// Suggest tag if one element exists while the other does not
 	if CompareAssignment(asTag, e, m) then
@@ -394,15 +881,12 @@ begin
 		exit;
 end;
 
-// ----------------------------------------------------------------------------
-// EvaluateByPath
-// ----------------------------------------------------------------------------
 procedure EvaluateByPath(asTag: String; e, m: IInterface; asPath: String);
 var
 	x, y: IInterface;
 begin
-	x := GetElement(e, asPath);
-	y := GetElement(m, asPath);
+	x := ElementByPath(e, asPath);
+	y := ElementByPath(m, asPath);
 
 	Evaluate(asTag, x, y);
 end;
@@ -573,7 +1057,7 @@ begin
 	if asTag = 'C.Climate' then
 	begin
 		// add tag if the Behave Like Exterior flag is set ine one record but not the other
-		if CompareFlags(asTag, e, m, {sPath} 'DATA', {sFlagName} 'Behave Like Exterior', True, True) then
+		if CompareFlags(asTag, e, m, 'DATA', 'Behave Like Exterior', True, True) then
 			exit;
 
 		// evaluate additional property
@@ -628,18 +1112,18 @@ begin
 	// Bookmark: C.SkyLighting
 	if asTag = 'C.SkyLighting' then
 		// add tag if the Behave Like Exterior flag is set ine one record but not the other
-		if CompareFlags(asTag, e, m, {sPath} 'DATA', {sFlagName} 'Use Sky Lighting', True, True) then
+		if CompareFlags(asTag, e, m, 'DATA', 'Use Sky Lighting', True, True) then
 			exit;
 
 	// Bookmark: C.Water
 	if asTag = 'C.Water' then
 	begin
 		// add tag if Has Water flag is set in one record but not the other
-		if CompareFlags(asTag, e, m, {sPath} 'DATA', {sFlagName} 'Has Water', True, True) then
+		if CompareFlags(asTag, e, m, 'DATA', 'Has Water', True, True) then
 			exit;
 
 		// exit if Is Interior Cell is set in either record
-		if CompareFlags(asTag, e, m, {sPath} 'DATA', {sFlagName} 'Is Interior Cell', False, False) then
+		if CompareFlags(asTag, e, m, 'DATA', 'Is Interior Cell', False, False) then
 			exit;
 
 		// evaluate properties
@@ -1134,24 +1618,22 @@ begin
 
 end;
 
-// ----------------------------------------------------------------------------
-// Delev, Relev
-// ----------------------------------------------------------------------------
 // Bookmark: Delev, Relev
 procedure ProcessDelevRelevTags(e, m: IInterface);
 var
 	i, j: integer;
 	kEntries, kEntriesMaster, kEntry, kEntryMaster: IInterface;
 	kCOED, kCOEDMaster: IInterface; // extra data
-	sSortKey, sSortKeyMaster, sTag: String; // sortkeys for extra data, sortkey is a compact text representation of element's values
+	sElement, sSortKey, sSortKeyMaster, sTag: String; // sortkeys for extra data, sortkey is a compact text representation of element's values
 begin
 	// nothing to do if already tagged
 	if TagExists('Delev') and TagExists('Relev') then
 		exit;
 
 	// get Leveled List Entries
-	kEntries       := ElementByName(e, 'Leveled List Entries');
-	kEntriesMaster := ElementByName(m, 'Leveled List Entries');
+	sElement := 'Leveled List Entries';
+	kEntries := ElementByName(e, sElement);
+	kEntriesMaster := ElementByName(m, sElement);
 
 	if not Assigned(kEntries)
 	or not Assigned(kEntriesMaster) then
@@ -1163,8 +1645,9 @@ begin
 	// iterate through all entries
 	for i := 0 to ElementCount(kEntries) - 1 do
 	begin
-		kEntry       := ElementByIndex(kEntries, i);
-		kEntryMaster := SortedArrayElementByValue(kEntriesMaster, 'LVLO\Reference', GetElementEditValues(kEntry, 'LVLO\Reference'));
+		sElement := 'LVLO\Reference';
+		kEntry := ElementByIndex(kEntries, i);
+		kEntryMaster := SortedArrayElementByValue(kEntriesMaster, sElement, GetElementEditValues(kEntry, sElement));
 
 		if Assigned(kEntryMaster) then
 		begin
@@ -1180,20 +1663,17 @@ begin
 				// Relev check for changed level, count, extra data
 				if wbGameMode <> gmTES4 then
 				begin
-					kCOED       := ElementBySignature(kEntry,  'COED');
-					kCOEDMaster := ElementBySignature(kEntryMaster, 'COED');
+					sElement := 'COED';
+					kCOED := ElementBySignature(kEntry, sElement);
+					kCOEDMaster := ElementBySignature(kEntryMaster, sElement);
 
-					sSortKey := '';
-					if Assigned(kCOED) then
-						sSortKey := SortKeyEx(kCOED);
+					sSortKey := SortKeyEx(kCOED);
+					sSortKeyMaster := SortKeyEx(kCOEDMaster);
 
-					sSortKeyMaster := '';
-					if Assigned(kCOEDMaster) then
-						sSortKeyMaster := SortKeyEx(kCOEDMaster);
-
-					if sSortKey <> sSortKeyMaster then
+					if not SameText(sSortKey, sSortKeyMaster) then
 					begin
-						AddLogEntry(sTag, '[Assigned]', sSortKey, sSortKeyMaster);
+						if optionOutputLog = mrYes then
+							AddLogEntry(sTag, '[Assigned]', sSortKey, sSortKeyMaster);
 						AddTag(sTag);
 						exit;
 					end;
@@ -1208,16 +1688,14 @@ begin
 	begin
 		if j < ElementCount(kEntriesMaster) then
 		begin
-			AddLogEntry(sTag, '[ElementCount]', kEntries, kEntriesMaster);
+			if optionOutputLog = mrYes then
+				AddLogEntry(sTag, '[ElementCount]', kEntries, kEntriesMaster);
 			AddTag(sTag);
 			exit;
 		end;
 	end;
 end;
 
-// ----------------------------------------------------------------------------
-// Debug Message
-// ----------------------------------------------------------------------------
 function AddLogEntry(asTag, asTestName: String; e, m: IInterface): String;
 var
 	sPrefix, sString: String;
@@ -1226,576 +1704,9 @@ begin
 		exit;
 
 	sPrefix := asTestName + ' ' + asTag + ': ';
-	sString := sPrefix + TrimLeft(FullPath(e)) + #13#10 + sPrefix + TrimLeft(FullPath(m));
+
+	sString := sPrefix + FullPath(m) + #13#10 + sPrefix + FullPath(e);
 	lsLog.Add(sString);
-end;
-
-
-// ******************************************************************
-// PROCESSOR
-// ******************************************************************
-
-// ----------------------------------------------------------------------------
-// Main
-// ----------------------------------------------------------------------------
-function Initialize: Integer;
-begin
-	// clear
-	ClearMessages();
-
-	// prompt to write tags to file header
-	optionAddTags := MessageDlg('Do you want to add suggested tags to the file header?', mtConfirmation, [mbYes, mbNo, mbAbort], 0);
-	if optionAddTags = mrAbort then
-		exit;
-
-	optionOutputLog := MessageDlg('Do you want a log of successful bash tag tests?', mtConfirmation, [mbYes, mbNo, mbAbort], 0);
-	if optionOutputLog = mrAbort then
-		exit;
-
-	// create list of log entries
-	lsLog := TStringList.Create;
-	lsLog.Sorted := False;
-	lsLog.Duplicates := dupAccept;
-
-	// create list of tags
-	lsTags := TStringList.Create;
-	lsTags.Delimiter := ','; // separated by comma
-
-	Separator(True);
-
-	if wbGameMode = gmFO3 then
-		AddMessage('Using record structure for Fallout 3');
-	if wbGameMode = gmFNV then
-		AddMessage('Using record structure for Fallout: New Vegas');
-	if wbGameMode = gmTES4 then
-		AddMessage('Using record structure for The Elder Scrolls IV: Oblivion');
-	if wbGameMode = gmTES5 then
-		AddMessage('Using record structure for The Elder Scrolls V: Skyrim');
-
-	Separator(False);
-end;
-
-
-
-// ----------------------------------------------------------------------------
-// Process
-// ----------------------------------------------------------------------------
-function Process(e: IInterface): Integer;
-var
-	o: IInterface;
-	sTag, sSignature: String;
-	ConflictState: TConflictThis;
-	bRunOnce: Boolean;
-	i, iFormID: Integer;
-begin
-	bRunOnce := False;
-
-	// exit conditions
-	ConflictState := ConflictAllForMainRecord(e);
-
-	// get record signature
-	sSignature := Signature(e);
-
-	if (optionAddTags = mrAbort)
-	or (sSignature = 'TES4')
-	or (ConflictState = caUnknown)
-	or (ConflictState = caOnlyOne)
-	or (ConflictState = caNoConflict) then
-		exit;
-
-	// get file and file name
-	if not bRunOnce then
-	begin
-		f  := GetFile(e);
-		fn := GetFileName(f);
-		bRunOnce := True;
-	end;
-
-	// exit if the record should not be processed
-	if (fn = 'Dawnguard.esm') then
-	begin
-		iFormID := FileFormID(e);
-		if (iFormID = $00016BCF)
-		or (iFormID = $0001EE6D)
-		or (iFormID = $0001FA4C)
-		or (iFormID = $00039F67)
-		or (iFormID = $0006C3B6) then
-			exit;
-	end;
-
-	// get master record
-	o := Master(e);
-
-	// exit if the override does not exist
-	if not Assigned(o) then
-		exit;
-
-	// if record overrides several masters, then get the last one
-	if OverrideCount(o) > 1 then
-		o := OverrideByIndex(o, OverrideCount(o) - 2);
-
-	// stop processing deleted records to avoid errors
-	if GetIsDeleted(e)
-	or GetIsDeleted(o) then
-		exit;
-
-	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FNV
-	// -------------------------------------------------------------------------------
-	if wbGameMode = gmFNV then
-		if sSignature = 'WEAP' then
-			ProcessTag('WeaponMods', e, o);
-
-	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to TES4
-	// -------------------------------------------------------------------------------
-	if wbGameMode = gmTES4 then
-	begin
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
-		begin
-			ProcessTag('Actors.Spells', e, o);
-
-			if sSignature = 'CREA' then
-				ProcessTag('Creatures.Blood', e, o);
-		end;
-
-		// TODO: Npc.EyesOnly - NOT IMPLEMENTED
-		// TODO: Npc.HairOnly - NOT IMPLEMENTED
-		// TODO: R.AddSpells - NOT IMPLEMENTED
-
-		if sSignature = 'RACE' then
-		begin
-			ProcessTag('R.ChangeSpells', e, o);
-			ProcessTag('R.Attributes-F', e, o);
-			ProcessTag('R.Attributes-M', e, o);
-		end;
-
-		if sSignature = 'ROAD' then
-			ProcessTag('Roads', e, o);
-
-		if sSignature = 'SPEL' then
-			ProcessTag('SpellStats', e, o);
-	end;
-
-	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to TES5
-	// -------------------------------------------------------------------------------
-	if wbGameMode = gmTES5 then
-		if sSignature = 'CELL' then
-		begin
-			ProcessTag('C.Location', e, o);
-			ProcessTag('C.Regions', e, o);
-			ProcessTag('C.SkyLighting', e, o);
-		end;
-
-	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FO3 and FNV
-	// -------------------------------------------------------------------------------
-	if (wbGameMode = gmFO3)
-	or (wbGameMode = gmFNV) then
-	begin
-		sTag := 'Destructible';
-		if (sSignature = 'ACTI')
-		or (sSignature = 'ALCH')
-		or (sSignature = 'AMMO')
-		or (sSignature = 'BOOK')
-		or (sSignature = 'CONT')
-		or (sSignature = 'DOOR')
-		or (sSignature = 'FURN')
-		or (sSignature = 'IMOD')
-		or (sSignature = 'KEYM')
-		or (sSignature = 'MISC')
-		or (sSignature = 'MSTT')
-		or (sSignature = 'PROJ')
-		or (sSignature = 'TACT')
-		or (sSignature = 'TERM')
-		or (sSignature = 'WEAP') then
-			ProcessTag(sTag, e, o);
-
-		// special handling for CREA and NPC_ record types
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
-			if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
-				ProcessTag(sTag, e, o);
-	end;
-
-	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FO3, FNV, and TES4
-	// -------------------------------------------------------------------------------
-	if (wbGameMode = gmFO3)
-	or (wbGameMode = gmFNV)
-	or (wbGameMode = gmTES4) then
-	begin
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
-		begin
-			sTag := 'Factions';
-			if wbGameMode = gmTES4 then
-				ProcessTag(sTag, e, o);
-			else
-				if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Factions', False, False) then
-					ProcessTag(sTag, e, o);
-		end;
-
-		if sSignature = 'FACT' then
-			ProcessTag('Relations', e, o);
-	end;
-
-	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FO3, FNV, and TES5
-	// -------------------------------------------------------------------------------
-	if (wbGameMode = gmFO3)
-	or (wbGameMode = gmFNV)
-	or (wbGameMode = gmTES5) then
-	begin
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
-		begin
-			sTag := 'Actors.ACBS';
-			if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Stats', False, False) then
-				ProcessTag(sTag, e, o);
-
-			sTag := 'Actors.AIData';
-			if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use AI Data', False, False) then
-				ProcessTag(sTag, e, o);
-
-			sTag := 'Actors.AIPackages';
-			if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use AI Packages', False, False) then
-				ProcessTag(sTag, e, o);
-
-			if sSignature = 'CREA' then
-				if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
-					ProcessTag('Actors.Anims', e, o);
-
-			if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Traits', False, False) then
-			begin
-				ProcessTag('Actors.CombatStyle', e, o);
-				ProcessTag('Actors.DeathItem', e, o);
-			end;
-
-			sTag := 'Actors.Skeleton';
-			if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
-				ProcessTag(sTag, e, o);
-
-			sTag := 'Actors.Stats';
-			if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Stats', False, False) then
-				ProcessTag(sTag, e, o);
-
-			// TODO: IIM - NOT IMPLEMENTED
-			// TODO: MustBeActiveIfImported - NOT IMPLEMENTED
-
-			if sSignature = 'NPC_' then
-			begin
-				sTag := 'NPC.Class';
-				if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Traits', False, False) then
-					ProcessTag(sTag, e, o);
-
-				sTag := 'NPC.Race';
-				if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Traits', False, False) then
-					ProcessTag(sTag, e, o);
-
-				sTag := 'NpcFaces';
-				if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
-					ProcessTag(sTag, e, o);
-			end;
-
-			sTag := 'Scripts';
-			if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Script', False, False) then
-				ProcessTag(sTag, e, o);
-		end;
-
-		if sSignature = 'CELL' then
-		begin
-			ProcessTag('C.Acoustic', e, o);
-			ProcessTag('C.Encounter', e, o);
-			ProcessTag('C.ImageSpace', e, o);
-		end;
-
-		if sSignature = 'RACE' then
-		begin
-			ProcessTag('Body-F', e, o);
-			ProcessTag('Body-M', e, o);
-			ProcessTag('Body-Size-F', e, o);
-			ProcessTag('Body-Size-M', e, o);
-			ProcessTag('Eyes', e, o);
-			ProcessTag('Hair', e, o);
-			ProcessTag('R.Description', e, o);
-			ProcessTag('R.Ears', e, o);
-			ProcessTag('R.Head', e, o);
-			ProcessTag('R.Mouth', e, o);
-			ProcessTag('R.Relations', e, o);
-			ProcessTag('R.Skills', e, o);
-			ProcessTag('R.Teeth', e, o);
-			ProcessTag('Voice-F', e, o);
-			ProcessTag('Voice-M', e, o);
-		end;
-
-		// TODO: ScriptContents - SHOULD NOT BE IMPLEMENTED
-		// -- According to the Wrye Bash Readme: "Should not be used. Can cause serious issues."
-
-		if (sSignature = 'ACTI')
-		or (sSignature = 'ALCH')
-		or (sSignature = 'ARMO')
-		or (sSignature = 'CONT')
-		or (sSignature = 'DOOR')
-		or (sSignature = 'FLOR')
-		or (sSignature = 'FURN')
-		or (sSignature = 'INGR')
-		or (sSignature = 'KEYM')
-		or (sSignature = 'LIGH')
-		or (sSignature = 'LVLC')
-		or (sSignature = 'MISC')
-		or (sSignature = 'QUST')
-		or (sSignature = 'WEAP') then
-			ProcessTag('Scripts', e, o);
-	end; // end game
-
-	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FO3, FNV, TES4, and TES5
-	// -------------------------------------------------------------------------------
-	if (wbGameMode = gmFO3)
-	or (wbGameMode = gmFNV)
-	or (wbGameMode = gmTES4)
-	or (wbGameMode = gmTES5) then
-	begin
-		if (sSignature = 'CELL') then
-		begin
-			ProcessTag('C.Climate', e, o);
-			ProcessTag('C.Light', e, o);
-			ProcessTag('C.Music', e, o);
-			ProcessTag('C.Name', e, o);
-			ProcessTag('C.Owner', e, o);
-			ProcessTag('C.RecordFlags', e, o);
-			ProcessTag('C.Water', e, o);
-		end;
-
-		// TODO: Deactivate - NOT IMPLEMENTED
-
-		// TAG: Delev, Relev
-		if (sSignature = 'LVLC')
-		or (sSignature = 'LVLI')
-		or (sSignature = 'LVLN')
-		or (sSignature = 'LVSP') then
-			ProcessDelevRelevTags(e, o);
-
-		// TODO: Filter - NOT IMPLEMENTED
-
-		if (sSignature = 'ACTI')
-		or (sSignature = 'ALCH')
-		or (sSignature = 'AMMO')
-		or (sSignature = 'APPA')
-		or (sSignature = 'ARMO')
-		or (sSignature = 'BOOK')
-		or (sSignature = 'BSGN')
-		or (sSignature = 'CLAS')
-		or (sSignature = 'CLOT')
-		or (sSignature = 'DOOR')
-		or (sSignature = 'FLOR')
-		or (sSignature = 'FURN')
-		or (sSignature = 'INGR')
-		or (sSignature = 'KEYM')
-		or (sSignature = 'LIGH')
-		or (sSignature = 'MGEF')
-		or (sSignature = 'MISC')
-		or (sSignature = 'SGST')
-		or (sSignature = 'SLGM')
-		or (sSignature = 'WEAP') then
-		begin
-			ProcessTag('Graphics', e, o);
-			ProcessTag('Names', e, o);
-			ProcessTag('Stats', e, o);
-
-			if (sSignature = 'ACTI')
-			or (sSignature = 'DOOR')
-			or (sSignature = 'LIGH')
-			or (sSignature = 'MGEF') then
-				ProcessTag('Sound', e, o);
-		end;
-
-
-		if (sSignature = 'CREA')
-		or (sSignature = 'EFSH')
-		or (sSignature = 'GRAS')
-		or (sSignature = 'LSCR')
-		or (sSignature = 'LTEX')
-		or (sSignature = 'REGN')
-		or (sSignature = 'STAT')
-		or (sSignature = 'TREE') then
-			ProcessTag('Graphics', e, o);
-
-		if sSignature = 'CONT' then
-		begin
-			ProcessTag('Invent', e, o);
-			ProcessTag('Names', e, o);
-			ProcessTag('Sound', e, o);
-		end;
-
-		if (sSignature = 'DIAL')
-		or (sSignature = 'ENCH')
-		or (sSignature = 'EYES')
-		or (sSignature = 'FACT')
-		or (sSignature = 'HAIR')
-		or (sSignature = 'QUST')
-		or (sSignature = 'RACE')
-		or (sSignature = 'SPEL')
-		or (sSignature = 'WRLD') then
-			ProcessTag('Names', e, o);
-
-		// TODO: NoMerge - NOT IMPLEMENTED
-
-		if (sSignature = 'WTHR') then
-			ProcessTag('Sound', e, o);
-
-		// special handling for CREA and NPC_
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
-		begin
-			if wbGameMode = gmTES4 then
-			begin
-				ProcessTag('Invent', e, o);
-				ProcessTag('Names', e, o);
-
-				if sSignature = 'CREA' then
-					ProcessTag('Sound', e, o);
-
-			end;
-
-			if wbGameMode <> gmTES4 then
-			begin
-				sTag := 'Invent';
-				if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Inventory', False, False) then
-					ProcessTag(sTag, e, o);
-
-				// special handling for CREA and NPC_ record types
-				sTag := 'Names';
-				if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Base Data', False, False) then
-					ProcessTag(sTag, e, o);
-
-				// special handling for CREA record type
-				sTag := 'Sound';
-				if sSignature = 'CREA' then
-					if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
-						ProcessTag(sTag, e, o);
-			end;
-		end;
-
-
-	end; // end game
-end;
-
-// ----------------------------------------------------------------------------
-// Finalize
-// ----------------------------------------------------------------------------
-function Finalize: Integer;
-var
-	kHeader, kDescription: IInterface;
-	sTags, eTags, dTags, bTags, tTags: TSTringList;
-	sDescription: String;
-begin
-	sTags := TStringList.Create;
-	eTags := TStringList.Create;
-	dTags := TStringList.Create;
-	bTags := TStringList.Create;
-	tTags := TStringList.Create;
-
-	// exit conditions
-	if (optionAddTags = mrAbort)
-	or not Assigned(lsTags)
-	or not Assigned(fn) then
-		exit;
-
-	// sort list of suggested tags
-	lsTags.Sort;
-
-	// output file name
-	AddMessage(Uppercase(fn));
-
-	// output log
-	if optionOutputLog = mrYes then
-		if lsLog.Count > 0 then
-			AddMessage(lsLog.Text);
-
-	// if any suggested tags were generated
-	if lsTags.Count > 0 then
-	begin
-		kHeader := ElementBySignature(f, 'TES4');
-
-		// determine if the header record exists
-		if Assigned(kHeader) then
-		begin
-			kDescription := ElementBySignature(kHeader, 'SNAM');
-			sTags.CommaText := lsTags.CommaText;
-			tTags.CommaText := lsTags.CommaText;
-			eTags.CommaText := Substring(GetEditValue(kDescription), '{{BASH:', '}}');
-			dTags.CommaText := Diff(eTags, sTags);
-
-			// exit if existing and suggested tags are the same
-			if (eTags.CommaText = sTags.CommaText) then
-			begin
-				AddMessage('No tags suggested. Exiting.' + #13#10);
-				Separator(False);
-				exit;
-			end;
-
-		// exit if the header record doesn't exist
-		end else begin
-			AddMessage('Header record not found. Nothing to do. Exiting.' + #13#10);
-			Separator(False);
-			exit;
-		end;
-
-		// write tags
-		if optionAddTags = mrYes then
-		begin
-			// if the description element doesn't exist, add the element
-			kDescription := AddElementByString(kHeader, 'SNAM');
-
-			if eTags <> sTags then
-			begin
-				// store description
-				sDescription := GetEditValue(kDescription);
-
-				// remove existing tags, if any; trim regardless
-				sDescription := Trim(RemoveFromEnd(sDescription, Format('{{BASH:%s}}', [eTags.DelimitedText])));
-
-				// write new description
-				SetEditValue(kDescription, sDescription + #13#10 + #13#10 + Format('{{BASH:%s}}', [lsTags.DelimitedText]));
-			end;
-
-			// output bad tags
-			bTags.CommaText := Diff(tTags, eTags);
-			FormatTags(bTags, 'bad tag removed:', 'bad tags removed:', 'No bad tags found.');
-
-			// output to log
-			FormatTags(dTags, 'tag added to file header:', 'tags added to file header:', 'No tags added.');
-		end;
-
-		// suggest tags only and output to log
-		if optionAddTags = mrNo then
-		begin
-			// output existing tags
-			FormatTags(eTags, 'existing tag found:', 'existing tags found:', 'No existing tags found.');
-
-			// output bad tags
-			bTags.CommaText := Diff(tTags, eTags);
-			FormatTags(bTags, 'bad tag found:', 'bad tags found:', 'No bad tags found.');
-
-			// output suggested tags
-			FormatTags(dTags, 'suggested tag to add:', 'suggested tags to add:', 'No suggested tags to add.');
-
-			// output all suggested tags
-			FormatTags(lsTags, 'suggested tag overall:', 'suggested tags overall:', 'No suggested tags overall.');
-		end;
-	end;
-
-	lsLog.Free;
-	lsTags.Free;
-	sTags.Free;
-	eTags.Free;
-	dTags.Free;
-	bTags.Free;
-	tTags.Free;
 end;
 
 end.
