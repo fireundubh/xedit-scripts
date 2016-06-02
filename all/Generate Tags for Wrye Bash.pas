@@ -22,7 +22,7 @@ var
 function Initialize: Integer;
 begin
 	sScriptName    := 'Tag Generator'; // working name
-	sScriptVersion := '1.6.1.0';
+	sScriptVersion := '1.6.1.1';
 	sScriptAuthor  := 'fireundubh';
 	sScriptEmail   := 'fireundubh@gmail.com';
 
@@ -221,7 +221,7 @@ begin
 		begin
 			sTag := 'Factions';
 			if wbGameMode = gmTES4 then
-				ProcessTag(sTag, e, o);
+				ProcessTag(sTag, e, o)
 			else
 				if not CompareFlags(sTag, e, o, sElement, 'Use Factions', False, False) then
 					ProcessTag(sTag, e, o);
