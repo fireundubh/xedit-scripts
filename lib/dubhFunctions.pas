@@ -2,6 +2,12 @@ unit dubhFunctions;
 
 uses mteFunctions;
 
+procedure UserPrompt(asCaption, asQuery: String);
+begin
+	if not InputQuery(asCaption, 'Value:', asQuery) then
+		exit;
+end;
+
 // --------------------------------------------------------------------
 // AddMessage
 // --------------------------------------------------------------------
@@ -40,6 +46,64 @@ begin
 end;
 
 // --------------------------------------------------------------------
+// Recursively add value of named field to list
+// --------------------------------------------------------------------
+procedure RecursiveAddToList(e: IInterface; elementName: String; results: TStringList);
+var
+	i, c: Integer;
+	kFile: IwbFile;
+	kMainRecord, kChild: IInterface;
+	sFile: String;
+begin
+	kMainRecord := ContainingMainRecord(e);
+
+	c := ElementCount(e);
+	if c > 0 then begin
+		for i := 0 to Pred(c) do begin
+			kChild := ElementByIndex(e, i);
+			if ElementCount(kChild) > 0 then
+				RecursiveAddToList(kChild, elementName, results)
+			else
+				if HasString(elementName, Name(kChild), False) then
+					results.Add(SmallNameEx(kMainRecord) + #9 + GetEditValue(kChild));
+		end;
+	end;
+end;
+
+// --------------------------------------------------------------------
+// Recursively add key-value pairs to list
+// --------------------------------------------------------------------
+procedure RecursiveAddPairToList(e: IInterface; keyName, valueName: String; results: TStringList);
+var
+	i, c: Integer;
+	kFile: IwbFile;
+	kMainRecord, kChild: IInterface;
+	sFile, sTempKey: String;
+begin
+	results.NameValueSeparator := '=';
+
+	kMainRecord := ContainingMainRecord(e);
+
+	sTempKey := '';
+
+	c := ElementCount(e);
+	if c > 0 then begin
+		for i := 0 to Pred(c) do begin
+			kChild := ElementByIndex(e, i);
+			if ElementCount(kChild) > 0 then
+				RecursiveAddPairToList(kChild, keyName, valueName, results)
+			else
+				if HasString(keyName, Name(kChild), False) then
+					sTempKey := GetEditValue(kChild);
+				if HasString(valueName, Name(kChild), False) then begin
+					results.CommaText := '"' + sTempKey + '"=' + GetEditValue(kChild);
+					sTempKey := '';
+				end;
+		end;
+	end;
+end;
+
+// --------------------------------------------------------------------
 // Return comma-separated list of hexadecimal form ids
 // --------------------------------------------------------------------
 function FlagsToHex(e: IInterface): String;
@@ -62,6 +126,8 @@ var
   i: Integer;
   ls: TStringList;
 begin
+	if not Assigned(e) then
+		Result := '';
 	ls := TStringList.Create;
 	for i := 0 to ElementCount(e) - 1 do
 		ls.Add(Name(ElementByIndex(e, i)));
@@ -219,10 +285,12 @@ begin
 		mdb := '<pre>';
 		mde := '</pre>';
 		mdd := '</pre> | <pre>';
-	end else begin
-		mdb := '`';
-		mde := '`';
-		mdd := '` | `';
+	end;
+
+	if not pre then begin
+		mdb := '';
+		mde := '';
+		mdd := ' | ';
 	end;
 
 	lsmd := TStringList.Create;
@@ -442,10 +510,9 @@ begin
 		Result := 0;
 
 	j := 0;
-	for i := 0 to l.Count - 1 do begin
+	for i := 0 to l.Count - 1 do
 		if (s = l[i]) then
 			j := j + 1;
-	end;
 
 	Result := j;
 end;
@@ -453,13 +520,13 @@ end;
 // --------------------------------------------------------------------
 // Returns true if the needle is in the haystack
 // --------------------------------------------------------------------
-function HasString(const n, h: String; const cs: Boolean): Boolean;
+function HasString(const asNeedle, asHaystack: String; const abCaseSensitive: Boolean): Boolean;
 begin
-	if cs then
-		if Pos(n, h) > 0 then
-			Result := True;
-	if not cs then
-		if Pos(Lowercase(n), Lowercase(h)) > 0 then
+	if abCaseSensitive then
+		if Pos(asNeedle, asHaystack) > 0 then
+			Result := True
+	else
+		if Pos(Lowercase(asNeedle), Lowercase(asHaystack)) > 0 then
 			Result := True;
 end;
 
@@ -528,21 +595,22 @@ end;
 function SortKeyEx(const e: IInterface): String;
 var
 	i: Integer;
+	kElement: IInterface;
 begin
-	Result := GetEditValue(e);
+	Result := Lowercase(GetEditValue(e));
 
-	// manipulate result for model paths - sometimes the same paths have different cases
-	if Pos('.nif', Lowercase(Result)) > 0 then
-		Result := Lowercase(GetEditValue(e));
+	for i := 0 to ElementCount(e) - 1 do
+	begin
+		kElement := ElementByIndex(e, i);
 
-	for i := 0 to ElementCount(e) - 1 do begin
-		if (Pos('unknown', Lowercase(Name(ElementByIndex(e, i)))) > 0)
-		or (Pos('unused', Lowercase(Name(ElementByIndex(e, i)))) > 0) then
+		if (Pos('unknown', Lowercase(Name(kElement))) > 0)
+		or (Pos('unused', Lowercase(Name(kElement))) > 0) then
 			exit;
-		if (Result <> '') then
-			Result := Result + ' ' + SortKeyEx(ElementByIndex(e, i))
+
+		if Result <> '' then
+			Result := Result + ' ' + SortKeyEx(kElement)
 		else
-			Result := SortKeyEx(ElementByIndex(e, i));
+			Result := SortKeyEx(kElement);
 	end;
 end;
 
