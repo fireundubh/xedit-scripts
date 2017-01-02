@@ -4,8 +4,8 @@
 	Author: fireundubh <fireundubh@gmail.com>
 
 	Requirements:
-	- https://github.com/fireundubh/xedit/blob/master/lib/dubhFunctions.pas
-	- https://github.com/matortheeternal/TES5EditScripts/blob/master/trunk/Edit%20Scripts/mteFunctions.pas
+	- https://raw.githubusercontent.com/fireundubh/xedit/master/lib/dubhFunctions.pas
+	- https://raw.githubusercontent.com/matortheeternal/TES5EditScripts/master/Edit%20Scripts/mteFunctions.pas
 }
 
 unit BashTagsDetector;
