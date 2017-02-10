@@ -472,17 +472,23 @@ end;
 // --------------------------------------------------------------------
 // Returns True if the x signature is in the y list of signatures
 // --------------------------------------------------------------------
-function InDelimitedList(const x, y: String; const z: Char): Boolean;
+function InDelimitedList(x, y: String; const z: Char): Boolean;
 var
-	idx: Integer;
+	i: Integer;
 	l: TStringList;
 begin
-	l := TStringList.Create;
-	l.Delimiter := z;
-	l.DelimitedText := y;
-	idx := l.IndexOf(x);
-	l.Free;
-	Result := (idx > -1);
+	i := -1;
+	try
+		l := TStringList.Create;
+		l.Delimiter := z;
+		l.DelimitedText := y;
+		i := l.IndexOf(x);
+	finally
+		FreeAndNil(l);
+		x := nil;
+		y := nil;
+	end;
+	Result := i > -1;
 end;
 
 // --------------------------------------------------------------------
