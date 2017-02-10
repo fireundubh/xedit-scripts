@@ -1,10 +1,10 @@
 {
 	Purpose: Automatic Bash Tag Generation for Wrye Bash and Mator Smash
-	Games: FO3/FNV/TES4/TES5
+	Games: FO3/FNV/TES4/TES5/SSE
 	Author: fireundubh <fireundubh@gmail.com>
 
 	Requirements:
-	- https://raw.githubusercontent.com/fireundubh/xedit/master/lib/dubhFunctions.pas
+	- https://raw.githubusercontent.com/fireundubh/xedit-scripts/master/lib/dubhFunctions.pas
 	- https://raw.githubusercontent.com/matortheeternal/TES5EditScripts/master/Edit%20Scripts/mteFunctions.pas
 }
 
@@ -22,7 +22,7 @@ var
 function Initialize: Integer;
 begin
 	sScriptName    := 'Tag Generator'; // working name
-	sScriptVersion := '1.6.1.1';
+	sScriptVersion := '1.6.1.2';
 	sScriptAuthor  := 'fireundubh';
 	sScriptEmail   := 'fireundubh@gmail.com';
 
@@ -58,10 +58,14 @@ begin
 		AddMessage('Using record structure for Fallout 3');
 	if wbGameMode = gmFNV then
 		AddMessage('Using record structure for Fallout: New Vegas');
+	if wbGameMode = gmFO4 then
+		Raise Exception.Create('Fallout 4 is not supported yet.');
 	if wbGameMode = gmTES4 then
-		AddMessage('Using record structure for The Elder Scrolls IV: Oblivion');
+		AddMessage('Using record structure for TES IV: Oblivion');
 	if wbGameMode = gmTES5 then
-		AddMessage('Using record structure for The Elder Scrolls V: Skyrim');
+		AddMessage('Using record structure for TES V: Skyrim');
+	if wbGameMode = gmSSE then
+		AddMessage('Using record structure for TES V: Skyrim Special Edition');
 
 	Separator(False);
 end;
@@ -140,8 +144,7 @@ begin
 	// -------------------------------------------------------------------------------
 	if wbGameMode = gmTES4 then
 	begin
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
+		if InDelimitedList(sSignature, 'CREA NPC_', ' ') then
 		begin
 			ProcessTag('Actors.Spells', e, o);
 
@@ -168,9 +171,9 @@ begin
 	end;
 
 	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to TES5
+	// GROUP: Supported tags exclusive to TES5 and SSE
 	// -------------------------------------------------------------------------------
-	if wbGameMode = gmTES5 then
+	if InDelimitedList(wbAppName, 'TES5 SSE', ' ') then
 		if sSignature = 'CELL' then
 		begin
 			ProcessTag('C.Location', e, o);
@@ -181,30 +184,14 @@ begin
 	// -------------------------------------------------------------------------------
 	// GROUP: Supported tags exclusive to FO3 and FNV
 	// -------------------------------------------------------------------------------
-	if (wbGameMode = gmFO3)
-	or (wbGameMode = gmFNV) then
+	if InDelimitedList(wbAppName, 'FO3 FNV', ' ') then
 	begin
 		sTag := 'Destructible';
-		if (sSignature = 'ACTI')
-		or (sSignature = 'ALCH')
-		or (sSignature = 'AMMO')
-		or (sSignature = 'BOOK')
-		or (sSignature = 'CONT')
-		or (sSignature = 'DOOR')
-		or (sSignature = 'FURN')
-		or (sSignature = 'IMOD')
-		or (sSignature = 'KEYM')
-		or (sSignature = 'MISC')
-		or (sSignature = 'MSTT')
-		or (sSignature = 'PROJ')
-		or (sSignature = 'TACT')
-		or (sSignature = 'TERM')
-		or (sSignature = 'WEAP') then
+		if InDelimitedList(sSignature, 'ACTI ALCH AMMO BOOK CONT DOOR FURN IMOD KEYM MISC MSTT PROJ TACT TERM WEAP', ' ') then
 			ProcessTag(sTag, e, o);
 
 		// special handling for CREA and NPC_ record types
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
+		if InDelimitedList(sSignature, 'CREA NPC_', ' ') then
 			if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
 				ProcessTag(sTag, e, o);
 	end;
@@ -212,12 +199,9 @@ begin
 	// -------------------------------------------------------------------------------
 	// GROUP: Supported tags exclusive to FO3, FNV, and TES4
 	// -------------------------------------------------------------------------------
-	if (wbGameMode = gmFO3)
-	or (wbGameMode = gmFNV)
-	or (wbGameMode = gmTES4) then
+	if InDelimitedList(wbAppName, 'FO3 FNV TES4', ' ') then
 	begin
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
+		if InDelimitedList(sSignature, 'CREA NPC_', ' ') then
 		begin
 			sTag := 'Factions';
 			if wbGameMode = gmTES4 then
@@ -232,14 +216,11 @@ begin
 	end;
 
 	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FO3, FNV, and TES5
+	// GROUP: Supported tags exclusive to FO3, FNV, TES5, and SSE
 	// -------------------------------------------------------------------------------
-	if (wbGameMode = gmFO3)
-	or (wbGameMode = gmFNV)
-	or (wbGameMode = gmTES5) then
+	if not (wbAppName = 'TES4') then
 	begin
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
+		if InDelimitedList(sSignature, 'CREA NPC_', ' ') then
 		begin
 			sTag := 'Actors.ACBS';
 			if not CompareFlags(sTag, e, o, sElement, 'Use Stats', False, False) then
@@ -323,153 +304,91 @@ begin
 		// TODO: ScriptContents - SHOULD NOT BE IMPLEMENTED
 		// -- According to the Wrye Bash Readme: "Should not be used. Can cause serious issues."
 
-		if (sSignature = 'ACTI')
-		or (sSignature = 'ALCH')
-		or (sSignature = 'ARMO')
-		or (sSignature = 'CONT')
-		or (sSignature = 'DOOR')
-		or (sSignature = 'FLOR')
-		or (sSignature = 'FURN')
-		or (sSignature = 'INGR')
-		or (sSignature = 'KEYM')
-		or (sSignature = 'LIGH')
-		or (sSignature = 'LVLC')
-		or (sSignature = 'MISC')
-		or (sSignature = 'QUST')
-		or (sSignature = 'WEAP') then
+		if InDelimitedList(sSignature, 'ACTI ALCH ARMO CONT DOOR FLOR FURN INGR KEYM LIGH LVLC MISC QUST WEAP', ' ') then
 			ProcessTag('Scripts', e, o);
 	end;
 
 	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FO3, FNV, TES4, and TES5
+	// GROUP: Supported tags exclusive to FO3, FNV, TES4, TES5, and SSE
+	// -- All except FO4, but FO4 raises exception so don't check wbAppName.
 	// -------------------------------------------------------------------------------
-	if (wbGameMode = gmFO3)
-	or (wbGameMode = gmFNV)
-	or (wbGameMode = gmTES4)
-	or (wbGameMode = gmTES5) then
+	if (sSignature = 'CELL') then
 	begin
-		if (sSignature = 'CELL') then
-		begin
-			ProcessTag('C.Climate', e, o);
-			ProcessTag('C.Light', e, o);
-			ProcessTag('C.Music', e, o);
-			ProcessTag('C.Name', e, o);
-			ProcessTag('C.Owner', e, o);
-			ProcessTag('C.RecordFlags', e, o);
-			ProcessTag('C.Water', e, o);
-		end;
+		ProcessTag('C.Climate', e, o);
+		ProcessTag('C.Light', e, o);
+		ProcessTag('C.Music', e, o);
+		ProcessTag('C.Name', e, o);
+		ProcessTag('C.Owner', e, o);
+		ProcessTag('C.RecordFlags', e, o);
+		ProcessTag('C.Water', e, o);
+	end;
 
-		// TODO: Deactivate - NOT IMPLEMENTED
+	// TODO: Deactivate - NOT IMPLEMENTED
 
-		// TAG: Delev, Relev
-		if (sSignature = 'LVLC')
-		or (sSignature = 'LVLI')
-		or (sSignature = 'LVLN')
-		or (sSignature = 'LVSP') then
-			ProcessDelevRelevTags(e, o);
+	// TAG: Delev, Relev
+	if InDelimitedList(sSignature, 'LVLC LVLI LVLN LVSP', ' ') then
+		ProcessDelevRelevTags(e, o);
 
-		// TODO: Filter - NOT IMPLEMENTED
+	// TODO: Filter - NOT IMPLEMENTED
 
-		if (sSignature = 'ACTI')
-		or (sSignature = 'ALCH')
-		or (sSignature = 'AMMO')
-		or (sSignature = 'APPA')
-		or (sSignature = 'ARMO')
-		or (sSignature = 'BOOK')
-		or (sSignature = 'BSGN')
-		or (sSignature = 'CLAS')
-		or (sSignature = 'CLOT')
-		or (sSignature = 'DOOR')
-		or (sSignature = 'FLOR')
-		or (sSignature = 'FURN')
-		or (sSignature = 'INGR')
-		or (sSignature = 'KEYM')
-		or (sSignature = 'LIGH')
-		or (sSignature = 'MGEF')
-		or (sSignature = 'MISC')
-		or (sSignature = 'SGST')
-		or (sSignature = 'SLGM')
-		or (sSignature = 'WEAP') then
-		begin
-			ProcessTag('Graphics', e, o);
-			ProcessTag('Names', e, o);
-			ProcessTag('Stats', e, o);
+	if InDelimitedList(sSignature, 'ACTI ALCH AMMO APPA ARMO BOOK BSGN CLAS CLOT DOOR FLOR FURN INGR KEYM LIGH MGEF MISC SGST SLGM WEAP', ' ') then
+	begin
+		ProcessTag('Graphics', e, o);
+		ProcessTag('Names', e, o);
+		ProcessTag('Stats', e, o);
 
-			if (sSignature = 'ACTI')
-			or (sSignature = 'DOOR')
-			or (sSignature = 'LIGH')
-			or (sSignature = 'MGEF') then
-				ProcessTag('Sound', e, o);
-		end;
+		if InDelimitedList(sSignature, 'ACTI DOOR LIGH MGEF', ' ') then
+			ProcessTag('Sound', e, o);
+	end;
 
+	if InDelimitedList(sSignature, 'CREA EFSH GRAS LSCR LTEX REGN STAT TREE', ' ') then
+		ProcessTag('Graphics', e, o);
 
-		if (sSignature = 'CREA')
-		or (sSignature = 'EFSH')
-		or (sSignature = 'GRAS')
-		or (sSignature = 'LSCR')
-		or (sSignature = 'LTEX')
-		or (sSignature = 'REGN')
-		or (sSignature = 'STAT')
-		or (sSignature = 'TREE') then
-			ProcessTag('Graphics', e, o);
+	if sSignature = 'CONT' then
+	begin
+		ProcessTag('Invent', e, o);
+		ProcessTag('Names', e, o);
+		ProcessTag('Sound', e, o);
+	end;
 
-		if sSignature = 'CONT' then
+	if InDelimitedList(sSignature, 'DIAL ENCH EYES FACT HAIR QUST RACE SPEL WRLD', ' ') then
+		ProcessTag('Names', e, o);
+
+	// TODO: NoMerge - NOT IMPLEMENTED
+
+	if (sSignature = 'WTHR') then
+		ProcessTag('Sound', e, o);
+
+	// special handling for CREA and NPC_
+	if InDelimitedList(sSignature, 'CREA NPC_', ' ') then
+	begin
+		if wbGameMode = gmTES4 then
 		begin
 			ProcessTag('Invent', e, o);
 			ProcessTag('Names', e, o);
-			ProcessTag('Sound', e, o);
+
+			if sSignature = 'CREA' then
+				ProcessTag('Sound', e, o);
+
 		end;
 
-		if (sSignature = 'DIAL')
-		or (sSignature = 'ENCH')
-		or (sSignature = 'EYES')
-		or (sSignature = 'FACT')
-		or (sSignature = 'HAIR')
-		or (sSignature = 'QUST')
-		or (sSignature = 'RACE')
-		or (sSignature = 'SPEL')
-		or (sSignature = 'WRLD') then
-			ProcessTag('Names', e, o);
-
-		// TODO: NoMerge - NOT IMPLEMENTED
-
-		if (sSignature = 'WTHR') then
-			ProcessTag('Sound', e, o);
-
-		// special handling for CREA and NPC_
-		if (sSignature = 'CREA')
-		or (sSignature = 'NPC_') then
+		if wbGameMode <> gmTES4 then
 		begin
-			if wbGameMode = gmTES4 then
-			begin
-				ProcessTag('Invent', e, o);
-				ProcessTag('Names', e, o);
+			sTag := 'Invent';
+			if not CompareFlags(sTag, e, o, sElement, 'Use Inventory', False, False) then
+				ProcessTag(sTag, e, o);
 
-				if sSignature = 'CREA' then
-					ProcessTag('Sound', e, o);
+			// special handling for CREA and NPC_ record types
+			sTag := 'Names';
+			if not CompareFlags(sTag, e, o, sElement, 'Use Base Data', False, False) then
+				ProcessTag(sTag, e, o);
 
-			end;
-
-			if wbGameMode <> gmTES4 then
-			begin
-				sTag := 'Invent';
-				if not CompareFlags(sTag, e, o, sElement, 'Use Inventory', False, False) then
+			// special handling for CREA record type
+			sTag := 'Sound';
+			if sSignature = 'CREA' then
+				if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
 					ProcessTag(sTag, e, o);
-
-				// special handling for CREA and NPC_ record types
-				sTag := 'Names';
-				if not CompareFlags(sTag, e, o, sElement, 'Use Base Data', False, False) then
-					ProcessTag(sTag, e, o);
-
-				// special handling for CREA record type
-				sTag := 'Sound';
-				if sSignature = 'CREA' then
-					if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
-						ProcessTag(sTag, e, o);
-			end;
 		end;
-
-
 	end;
 end;
 
@@ -1159,7 +1078,7 @@ begin
 		EvaluateByPath(asTag, x, y, 'Stages');
 
 		// assign Destructable flags
-		if wbGameMode <> gmTES5 then
+		if not InDelimitedList(wbAppName, 'TES5 SSE', ' ') then
 		begin
 			sElement := 'Flags';
 			j := ElementByName(a, sElement);
@@ -1206,24 +1125,18 @@ begin
 	if asTag = 'Graphics' then
 	begin
 		// evaluate Icon and Model properties
-		if (sSignature = 'ALCH') or (sSignature = 'AMMO') or (sSignature = 'APPA')
-		or (sSignature = 'BOOK') or (sSignature = 'INGR')	or (sSignature = 'KEYM')
-		or (sSignature = 'LIGH') or (sSignature = 'MGEF') or (sSignature = 'MISC')
-		or (sSignature = 'SGST') or (sSignature = 'SLGM')	or (sSignature = 'TREE')
-		or (sSignature = 'WEAP') then
+		if InDelimitedList(sSignature, 'ALCH AMMO APPA BOOK INGR KEYM LIGH MGEF MISC SGST SLGM TREE WEAP', ' ') then
 		begin
 			EvaluateByPath(asTag, e, m, 'Icon');
 			EvaluateByPath(asTag, e, m, 'Model');
 		end;
 
 		// evaluate Icon properties
-		if (sSignature = 'BSGN') or (sSignature = 'CLAS') or (sSignature = 'LSCR')
-		or (sSignature = 'LTEX') or (sSignature = 'REGN') then
+		if InDelimitedList(sSignature, 'BSGN CLAS LSCR LTEX REGN', ' ') then
 			EvaluateByPath(asTag, e, m, 'Icon');
 
 		// evaluate Model properties
-		if (sSignature = 'ACTI') or (sSignature = 'DOOR') or (sSignature = 'FLOR')
-		or (sSignature = 'FURN') or (sSignature = 'GRAS') or (sSignature = 'STAT') then
+		if InDelimitedList(sSignature, 'ACTI DOOR FLOR FURN GRAS STAT', ' ') then
 			EvaluateByPath(asTag, e, m, 'Model');
 
 		// evaluate ARMO properties
@@ -1268,8 +1181,7 @@ begin
 			end;
 
 			// ARMO - FO3, FNV
-			if (wbGameMode = gmFO3)
-			or (wbGameMode = gmFNV) then
+			if InDelimitedList(wbAppName, 'FO3 FNV', ' ') then
 			begin
 				// evaluate Icon properties
 				EvaluateByPath(asTag, e, m, 'ICON');
@@ -1303,7 +1215,7 @@ begin
 			end;
 
 			// ARMO - TES5
-			if wbGameMode = gmTES5 then
+			if InDelimitedList(wbAppName, 'TES5 SSE', ' ') then
 			begin
 				// evaluate Icon properties
 				EvaluateByPath(asTag, e, m, 'Icon');
@@ -1367,7 +1279,7 @@ begin
 			// evaluate other properties
 			EvaluateByPath(asTag, e, m, 'NAM7');
 
-			if wbGameMode = gmTES5 then
+			if InDelimitedList(wbAppName, 'TES5 SSE', ' ') then
 			begin
 				EvaluateByPath(asTag, e, m, 'NAM8');
 				EvaluateByPath(asTag, e, m, 'NAM9');
@@ -1377,7 +1289,7 @@ begin
 		end;
 
 		// evaluate MGEF properties
-		if wbGameMode = gmTES5 then
+		if InDelimitedList(wbAppName, 'TES5 SSE', ' ') then
 			if sSignature = 'MGEF' then
 			begin
 				EvaluateByPath(asTag, e, m, 'Magic Effect Data\DATA\Casting Light');
@@ -1526,8 +1438,8 @@ begin
 			if sSignature = 'CONT' then
 			begin
 				EvaluateByPath(asTag, e, m, 'QNAM');
-				if (wbGameMode <> gmFO3) or (wbGameMode <> gmTES5) then
-					EvaluateByPath(asTag, e, m, 'RNAM'); // FO3 and TESV don't have this element
+				if not InDelimitedList(wbAppName, 'FO3 TES5 SSE', ' ') then
+					EvaluateByPath(asTag, e, m, 'RNAM'); // FO3, TESV, and SSE don't have this element
 			end;
 
 			// Doors
@@ -1549,12 +1461,12 @@ begin
 		// Magic Effects
 		if sSignature = 'MGEF' then
 		begin
-			// TES5
-			if wbGameMode = gmTES5 then
+			// TES5, SSE
+			if InDelimitedList(wbAppName, 'TES5 SSE', ' ') then
 				EvaluateByPath(asTag, e, m, 'SNDD');
 
-			// FO3, FNV, TES4
-			if wbGameMode <> gmTES5 then
+			// FO3, FNV, TES4, SSE
+			if not InDelimitedList(wbAppName, 'TES5 SSE', ' ') then
 			begin
 				EvaluateByPath(asTag, e, m, 'DATA\Effect sound');
 				EvaluateByPath(asTag, e, m, 'DATA\Bolt sound');
@@ -1575,25 +1487,12 @@ begin
 	// Bookmark: Stats
 	if asTag = 'Stats' then
 	begin
-		if (sSignature = 'ALCH')
-		or (sSignature = 'AMMO')
-		or (sSignature = 'APPA')
-		or (sSignature = 'ARMO')
-		or (sSignature = 'BOOK')
-		or (sSignature = 'CLOT')
-		or (sSignature = 'INGR')
-		or (sSignature = 'KEYM')
-		or (sSignature = 'LIGH')
-		or (sSignature = 'MISC')
-		or (sSignature = 'SGST')
-		or (sSignature = 'SLGM')
-		or (sSignature = 'WEAP') then
+		if InDelimitedList(sSignature, 'ALCH AMMO APPA ARMO BOOK CLOT INGR KEYM LIGH MISC SGST SLGM WEAP', ' ') then
 		begin
 			EvaluateByPath(asTag, e, m, 'EDID');
 			EvaluateByPath(asTag, e, m, 'DATA');
 
-			if (sSignature = 'ARMO')
-			or (sSignature = 'WEAP') then
+			if InDelimitedList(sSignature, 'ARMO WEAP', ' ') then
 				EvaluateByPath(asTag, e, m, 'DNAM');
 
 			if sSignature = 'WEAP' then
