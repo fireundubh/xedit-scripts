@@ -760,19 +760,6 @@ begin
 end;
 
 // --------------------------------------------------------------------
-// Copies a record as an override to a file
-// --------------------------------------------------------------------
-procedure AddOverrideToFile(const f: IwbFile; const r: IInterface);
-var
-	o, edid, full: IInterface;
-begin
-	o := wbCopyElementToFile(r, f, False, True);
-	edid := AddElementByString(o, 'EDID');
-	full := AddElementByString(o, 'FULL');
-	SetEditValue(full, GetEditValue(edid));
-end;
-
-// --------------------------------------------------------------------
 // Int to Bin
 // --------------------------------------------------------------------
 function IntToBin(value: LongInt; sz: Integer): String;
