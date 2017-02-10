@@ -11,15 +11,61 @@ begin
 end;
 
 // --------------------------------------------------------------------
+// Returns x number of characters from left, or returns whole string
+// if x number of characters exceed length of string
+// --------------------------------------------------------------------
+function LeftStr(s: String; i: Integer): String;
+begin 
+	if i > Length(s) then 
+		Result := s
+	else
+		Result := Copy(s, 0, i);
+end;
+
+// --------------------------------------------------------------------
+// Returns x number of characters from right, or returns whole string
+// if x number of characters exceed length of string
+// --------------------------------------------------------------------
+function RightStr(s: String; i: Integer): String;
+begin 
+	if i > Length(s) then 
+		Result := s
+	else
+		Result := Copy(s, Length(s) - (i - 1), i);
+end;
+
+// --------------------------------------------------------------------
+// Returns cell reference from REFR/ACHR
+// --------------------------------------------------------------------
+function GetCell(e: IInterface): IInterface;
+var 
+	cell: IInterface;
+begin
+	cell := ElementByName(e, 'Cell');
+	if not Assigned(cell) then 
+		Result := nil
+	else
+		Result := LinksTo(cell);
+end;
+
+// --------------------------------------------------------------------
 // Return whether a value is null
 // --------------------------------------------------------------------
 function IsNull(x: Variant): Boolean;
+var 
+	sDefType: String;
 begin
-	if (DefTypeString(x) = 'dtInteger') and not CanContainFormIDs(x) then
-		Result := (GetNativeValue(x) = 0)
-	else if (DefTypeString(x) = 'dtFloat') and not CanContainFormIDs(x) then
-		Result := (GetNativeValue(x) = 0.0)
-	else if CanContainFormIDs(x) then
+	if not CanContainFormIDs(x) then begin
+		sDefType := DefTypeString(x);
+		
+		if sDefType = 'dtInteger' then
+			Result := (GetNativeValue(x) = 0)
+		else if sDefType = 'dtFloat' then
+			Result := (GetNativeValue(x) = 0.0);
+		exit;
+	end;
+	
+	if CanContainFormIDs(x) then
 		Result := HasString('00000000', GetEditValue(x), False);
 end;
 
