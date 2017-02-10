@@ -2,12 +2,6 @@ unit dubhFunctions;
 
 uses mteFunctions;
 
-procedure UserPrompt(asCaption, asQuery: String);
-begin
-	if not InputQuery(asCaption, 'Value:', asQuery) then
-		exit;
-end;
-
 // --------------------------------------------------------------------
 // AddMessage
 // --------------------------------------------------------------------
