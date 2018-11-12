@@ -1572,7 +1572,7 @@ begin
 					if not SameText(sSortKey, sSortKeyMaster) then
 					begin
 						if optionOutputLog = mrYes then
-							AddLogEntry(sTag, '[Assigned]', sSortKey, sSortKeyMaster);
+							AddLogEntry(sTag, '[Assigned]', kCOED, kCOEDMaster);
 						AddTag(sTag);
 						exit;
 					end;
