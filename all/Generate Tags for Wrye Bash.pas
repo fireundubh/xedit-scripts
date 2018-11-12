@@ -22,7 +22,7 @@ var
 function Initialize: Integer;
 begin
 	sScriptName    := 'Tag Generator'; // working name
-	sScriptVersion := '1.6.1.2';
+	sScriptVersion := '1.6.1.3';
 	sScriptAuthor  := 'fireundubh';
 	sScriptEmail   := 'fireundubh@gmail.com';
 
