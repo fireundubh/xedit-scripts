@@ -1,6 +1,6 @@
 {
 	Purpose: Automatic Bash Tag Generation for Wrye Bash and Mator Smash
-	Games: FO3/FNV/TES4/TES5/SSE
+	Games: FO3/FO4/FNV/TES4/TES5/SSE
 	Author: fireundubh <fireundubh@gmail.com>
 
 	Requirements:
@@ -59,7 +59,8 @@ begin
 	if wbGameMode = gmFNV then
 		AddMessage('Using record structure for Fallout: New Vegas');
 	if wbGameMode = gmFO4 then
-		Raise Exception.Create('Fallout 4 is not supported yet.');
+		// Raise Exception.Create('Fallout 4 is not supported yet.');
+		AddMessage('Using record structure for Fallout 4');
 	if wbGameMode = gmTES4 then
 		AddMessage('Using record structure for TES IV: Oblivion');
 	if wbGameMode = gmTES5 then
@@ -171,9 +172,9 @@ begin
 	end;
 
 	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to TES5 and SSE
+	// GROUP: Supported tags exclusive to TES5, SSE and FO4
 	// -------------------------------------------------------------------------------
-	if InDelimitedList(wbAppName, 'TES5 SSE', ' ') then
+	if InDelimitedList(wbAppName, 'TES5 SSE FO4', ' ') then
 		if sSignature = 'CELL' then
 		begin
 			ProcessTag('C.Location', e, o);
@@ -216,7 +217,7 @@ begin
 	end;
 
 	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FO3, FNV, TES5, and SSE
+	// GROUP: Supported tags exclusive to FO3, FNV, FO4, TES5, and SSE
 	// -------------------------------------------------------------------------------
 	if not (wbAppName = 'TES4') then
 	begin
@@ -308,10 +309,6 @@ begin
 			ProcessTag('Scripts', e, o);
 	end;
 
-	// -------------------------------------------------------------------------------
-	// GROUP: Supported tags exclusive to FO3, FNV, TES4, TES5, and SSE
-	// -- All except FO4, but FO4 raises exception so don't check wbAppName.
-	// -------------------------------------------------------------------------------
 	if (sSignature = 'CELL') then
 	begin
 		ProcessTag('C.Climate', e, o);
