@@ -59,8 +59,12 @@ begin
 	if wbGameMode = gmFNV then
 		AddMessage('Using record structure for Fallout: New Vegas');
 	if wbGameMode = gmFO4 then
-		// Raise Exception.Create('Fallout 4 is not supported yet.');
-		AddMessage('Using record structure for Fallout 4');
+		AddMessage('Using record structure for Fallout 4'
+		+#13#10+'Wrye Bash for Fallout 4 DOES NOT support many bash tags currently,'
+		+#13#10+'use Mator Smash instead!'
+		+#13#10
+		+#13#10+'If you have the technical knowhow, please consider helping the Wrye Bash team update.'
+		+#13#10+'You can find them at: https://github.com/wrye-bash/wrye-bash/');
 	if wbGameMode = gmTES4 then
 		AddMessage('Using record structure for TES IV: Oblivion');
 	if wbGameMode = gmTES5 then
