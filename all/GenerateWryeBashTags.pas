@@ -177,22 +177,7 @@ begin
 
   AddMessage(#10);
 
-  // fail if the user loaded more plugins than expected
   BuildMasterPluginsList(kFile, slMasterPlugins);
-
-//  for i := 0 to Pred(FileCount) do begin
-//    sMasterName := GetFileName(FileByIndex(i));
-//
-//    if (sMasterName = 'Update.esm') or EndsText('.exe', sMasterName) then
-//      continue;
-//
-//    if slMasterPlugins.IndexOf(sMasterName) = -1 then
-//    begin
-//      LogError('Cannot continue because more plugins are loaded than expected');
-//      bQuickExit := True;
-//      exit;
-//    end;
-//  end;
 
   LogInfo('Processing... Please wait. This could take a while.');
 
@@ -311,7 +296,7 @@ begin
     exit;
 
   // exit if the record should not be processed
-  if CompareText(sFileName, 'Dawnguard.esm') then
+  if CompareText(sFileName, 'Dawnguard.esm') = 0 then
   begin
     iFormID := FileFormID(e);
     if (iFormID = $00016BCF)
