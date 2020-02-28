@@ -6,11 +6,19 @@
 
 unit GenerateWryeBashTags;
 
+
+const
+  scaleFactor = Screen.PixelsPerInch / 96;
+
+
 var
   kFile           : IwbFile;
+  slBadTags       : TStringList;
+  slDifferentTags : TStringList;
+  slExistingTags  : TStringList;
   slLog           : TStringList;
-  slSuggestedTags : TStringList;
   slMasterPlugins : TStringList;
+  slSuggestedTags : TStringList;
   sFileName       : String;
   sTag            : String;
   sScriptName     : String;
@@ -19,8 +27,7 @@ var
   sScriptEmail    : String;
   optionAddTags   : Integer;
   optionOutputLog : Integer;
-  bDebug          : Boolean;
-  bRunOnce        : Boolean;
+  bQuickExit      : Boolean;
 
 
 function wbIsOblivion: Boolean;
@@ -70,7 +77,7 @@ var
   m: IwbFile;
   i: Integer;
 begin
-	output.Add(GetFileName(f));
+  output.Add(GetFileName(f));
 
   for i := 0 to Pred(MasterCount(f)) do
   begin
@@ -101,10 +108,16 @@ end;
 
 function Initialize: Integer;
 var
-  i : Integer;
+  kDescription : IInterface;
+  kHeader      : IInterface;
+  sBashTags    : String;
+  sDescription : String;
+  sMasterName  : String;
+  r            : IwbMainRecord;
+  i            : Integer;
 begin
   sScriptName    := 'GenerateWryeBashTags'; // working name
-  sScriptVersion := '1.6.2.0';
+  sScriptVersion := '1.6.3.0';
   sScriptAuthor  := 'fireundubh';
   sScriptEmail   := 'fireundubh@gmail.com';
 
@@ -116,14 +129,14 @@ begin
   LogInfo(sScriptName + ' v' + sScriptVersion + ' by ' + sScriptAuthor + ' <' + sScriptEmail + '>');
   AddMessage(#10);
 
-  // prompt to write tags to file header
-  optionAddTags := MessageDlg('Do you want to add suggested tags to the file header?', mtConfirmation, [mbYes, mbNo, mbAbort], 0);
-  if optionAddTags = mrAbort then
+  optionAddTags   := mrNo;
+  optionOutputLog := mrYes;
+
+  kFile := Configure(sScriptName + ' v' + sScriptVersion);
+  if not Assigned(kFile) then
     exit;
 
-  optionOutputLog := MessageDlg('Do you want a log of successful bash tag tests?', mtConfirmation, [mbYes, mbNo, mbAbort], 0);
-  if optionOutputLog = mrAbort then
-    exit;
+  sFileName := GetFileName(kFile);
 
   // create list of log entries
   slLog := TStringList.Create;
@@ -136,6 +149,10 @@ begin
   slSuggestedTags.Duplicates := dupIgnore;
   slSuggestedTags.Delimiter := ','; // separated by comma
 
+  slExistingTags  := TStringList.Create; // existing tags
+  slDifferentTags := TStringList.Create; // different tags
+  slBadTags       := TStringList.Create; // bad tags
+
   if wbIsFallout3 then
     LogInfo('Using game mode: Fallout 3');
   if wbIsFalloutNV then
@@ -143,7 +160,10 @@ begin
   if wbIsFallout4 then
     LogInfo('Using game mode: Fallout 4');
   if wbIsFallout76 then
-    Raise Exception.Create('Fallout 76 is not supported yet.');
+  begin
+    LogError('Fallout 76 is not supported by CBash.');
+    exit;
+  end;
   if wbIsOblivion then
     LogInfo('Using game mode: Oblivion');
   if wbIsSkyrim and not wbIsSkyrimSE then
@@ -155,26 +175,129 @@ begin
   slMasterPlugins.Duplicates := dupIgnore;
   slMasterPlugins.Sorted := True;
 
-  bRunOnce := False;
+  AddMessage(#10);
+
+  // fail if the user loaded more plugins than expected
+  BuildMasterPluginsList(kFile, slMasterPlugins);
+
+//  for i := 0 to Pred(FileCount) do begin
+//    sMasterName := GetFileName(FileByIndex(i));
+//
+//    if (sMasterName = 'Update.esm') or EndsText('.exe', sMasterName) then
+//      continue;
+//
+//    if slMasterPlugins.IndexOf(sMasterName) = -1 then
+//    begin
+//      LogError('Cannot continue because more plugins are loaded than expected');
+//      bQuickExit := True;
+//      exit;
+//    end;
+//  end;
+
+  LogInfo('Processing... Please wait. This could take a while.');
+
+  for i := 0 to Pred(RecordCount(kFile)) do
+    ProcessRecord(RecordByIndex(kFile, i));
 
   AddMessage(#10);
 
-  LogInfo('Processing... Please wait. This could take a while.');
+  // exit conditions
+  if not Assigned(sFileName) then
+    exit;
+
+  // output file name
+  LogInfo(Uppercase(sFileName));
+
+  AddMessage(#10);
+
+  // output log
+  if optionOutputLog = mrYes then
+    for i := 0 to Pred(slLog.Count) do
+      LogInfo(slLog[i]);
+
+  if (optionOutputLog = mrYes) and (slLog.Count > 0) then
+    AddMessage(#10);
+
+  // if any suggested tags were generated
+  if slSuggestedTags.Count > 0 then
+  begin
+    kHeader := ElementBySignature(kFile, 'TES4');
+
+    // determine if the header record exists
+    if Assigned(kHeader) then
+    begin
+      kDescription := ElementBySignature(kHeader, 'SNAM');
+      sDescription := GetEditValue(kDescription);
+
+      // categorize tag list
+      sBashTags := RegExMatch('(?:[{]{2}BASH:).*?[}]{2}', sDescription);
+      if Length(sBashTags) > 0 then
+      begin
+        sBashTags := Trim(MidStr(sBashTags, 8, Length(sBashTags) - 9));
+        slExistingTags.CommaText := sBashTags;
+      end else
+        slExistingTags.CommaText := '';
+
+      slDifferentTags := Diff(slSuggestedTags, slExistingTags);
+      slBadTags := Diff(slExistingTags, slSuggestedTags);
+      slSuggestedTags.AddStrings(slDifferentTags);
+
+      // exit if existing and suggested tags are the same
+      if SameText(slExistingTags.CommaText, slSuggestedTags.CommaText) then
+      begin
+        LogInfo(FormatTags(slExistingTags, 'existing tag found:', 'existing tags found:', 'No existing tags found.'));
+        LogInfo(FormatTags(slSuggestedTags, 'suggested tag:', 'suggested tags:', 'No suggested tags.'));
+        LogWarn('No tags to add.' + #13#10);
+        exit;
+      end;
+
+    // exit if the header record doesn't exist
+    end else begin
+      LogError('Header record not found. Nothing to do. Exiting.' + #13#10);
+      exit;
+    end;
+
+    // write tags
+    if optionAddTags = mrYes then
+    begin
+      // if the description element doesn't exist, add the element
+      kDescription := ElementBySignature(kHeader, 'SNAM');
+      if not Assigned(kDescription) then
+        kDescription := Add(kHeader, 'SNAM', True);
+
+      if not SameText(slExistingTags.CommaText, slSuggestedTags.CommaText) then
+      begin
+        sDescription := GetEditValue(kDescription);
+        sDescription := Trim(RemoveFromEnd(sDescription, Format('{{BASH:%s}}', [slExistingTags.DelimitedText])));
+        SetEditValue(kDescription, sDescription + #13#10 + #13#10 + Format('{{BASH:%s}}', [slSuggestedTags.DelimitedText]));
+      end;
+
+      LogInfo(FormatTags(slBadTags,       'bad tag removed:',          'bad tags removed:',          'No bad tags found.'));
+      LogInfo(FormatTags(slDifferentTags, 'tag added to file header:', 'tags added to file header:', 'No tags added.'));
+    end;
+
+    // suggest tags only and output to log
+    if optionAddTags = mrNo then
+    begin
+      LogInfo(FormatTags(slExistingTags,  'existing tag found:',    'existing tags found:',    'No existing tags found.'));
+      LogInfo(FormatTags(slBadTags,       'bad tag found:',         'bad tags found:',         'No bad tags found.'));
+      LogInfo(FormatTags(slDifferentTags, 'suggested tag to add:',  'suggested tags to add:',  'No suggested tags to add.'));
+      LogInfo(FormatTags(slSuggestedTags, 'suggested tag overall:', 'suggested tags overall:', 'No suggested tags overall.'));
+    end;
+  end else
+    LogInfo('No tags are suggested for this plugin.');
 
   AddMessage(#10);
 end;
 
 
-function Process(e: IInterface): Integer;
+function ProcessRecord(e: IInterface): Integer;
 var
   o             : IInterface;
-  sElement      : String;
   sTag          : String;
   sSignature    : String;
-  sMasterName   : String;
   ConflictState : TConflictThis;
   iFormID       : Integer;
-  i             : Integer;
 begin
   // exit conditions
   ConflictState := ConflictAllForMainRecord(e);
@@ -182,41 +305,13 @@ begin
   // get record signature
   sSignature := Signature(e);
 
-  if (optionAddTags = mrAbort)
-  or (optionOutputLog = mrAbort)
-  or (sSignature = 'TES4')
-  or (ConflictState = caUnknown)
+  if (ConflictState = caUnknown)
   or (ConflictState = caOnlyOne)
   or (ConflictState = caNoConflict) then
     exit;
 
-  // get file and file name
-  if not bRunOnce then
-  begin
-    kFile := GetFile(e);
-    sFileName := GetFileName(kFile);
-
-		// fail if the user loaded more plugins than expected
-    BuildMasterPluginsList(kFile, slMasterPlugins);
-
-    for i := 0 to Pred(FileCount) do begin
-      sMasterName := GetFileName(FileByIndex(i));
-
-      if (sMasterName = 'Update.esm') or EndsText('.exe', sMasterName) then
-        continue;
-
-      if slMasterPlugins.IndexOf(sMasterName) = -1 then
-      begin
-        LogError('Cannot continue because more plugins are loaded than expected');
-        exit;
-      end;
-    end;
-
-    bRunOnce := True;
-  end;
-
   // exit if the record should not be processed
-  if (sFileName = 'Dawnguard.esm') then
+  if CompareText(sFileName, 'Dawnguard.esm') then
   begin
     iFormID := FileFormID(e);
     if (iFormID = $00016BCF)
@@ -228,17 +323,18 @@ begin
   end;
 
   // get master record if record is an override
-  o := MasterOrSelf(e);
+  o := Master(e);
+
+  if not Assigned(o) then
+    exit;
 
   // if record overrides several masters, then get the last one
-  o := HighestOverrideOrSelf(o, OverrideCount(o));
+  o := HighestOverrideOrSelfInList(o, OverrideCount(o), slMasterPlugins);
 
   // stop processing deleted records to avoid errors
   if GetIsDeleted(e)
   or GetIsDeleted(o) then
     exit;
-
-  sElement := 'ACBS\Template Flags';
 
   // -------------------------------------------------------------------------------
   // GROUP: Supported tags exclusive to FNV
@@ -282,6 +378,7 @@ begin
   // GROUP: Supported tags exclusive to TES5 and SSE
   // -------------------------------------------------------------------------------
   if wbIsSkyrim then
+  begin
     if sSignature = 'CELL' then
     begin
       ProcessTag('C.Location', e, o);
@@ -289,6 +386,10 @@ begin
       ProcessTag('C.Regions', e, o);
       ProcessTag('C.SkyLighting', e, o);
     end;
+
+    if InDelimitedList(sSignature, 'ACTI ALCH AMMO ARMO BOOK FLOR FURN INGR KEYM LCTN MGEF MISC NPC_ SCRL SLGM SPEL TACT WEAP', ' ') then
+      ProcessTag('Keywords', e, o);
+  end;
 
   // -------------------------------------------------------------------------------
   // GROUP: Supported tags exclusive to FO3 and FNV
@@ -301,7 +402,7 @@ begin
 
     // special handling for CREA and NPC_ record types
     if InDelimitedList(sSignature, 'CREA NPC_', ' ') then
-      if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+      if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
         ProcessTag(sTag, e, o);
   end;
 
@@ -316,7 +417,7 @@ begin
       if wbIsOblivion then
         ProcessTag(sTag, e, o)
       else
-        if not CompareFlags(sTag, e, o, sElement, 'Use Factions', False, False) then
+        if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Factions', False, False) then
           ProcessTag(sTag, e, o);
     end;
 
@@ -332,33 +433,33 @@ begin
     if InDelimitedList(sSignature, 'CREA NPC_', ' ') then
     begin
       sTag := 'Actors.ACBS';
-      if not CompareFlags(sTag, e, o, sElement, 'Use Stats', False, False) then
+      if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Stats', False, False) then
         ProcessTag(sTag, e, o);
 
       sTag := 'Actors.AIData';
-      if not CompareFlags(sTag, e, o, sElement, 'Use AI Data', False, False) then
+      if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use AI Data', False, False) then
         ProcessTag(sTag, e, o);
 
       sTag := 'Actors.AIPackages';
-      if not CompareFlags(sTag, e, o, sElement, 'Use AI Packages', False, False) then
+      if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use AI Packages', False, False) then
         ProcessTag(sTag, e, o);
 
       if sSignature = 'CREA' then
-        if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+        if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
           ProcessTag('Actors.Anims', e, o);
 
-      if not CompareFlags(sTag, e, o, sElement, 'Use Traits', False, False) then
+      if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Traits', False, False) then
       begin
         ProcessTag('Actors.CombatStyle', e, o);
         ProcessTag('Actors.DeathItem', e, o);
       end;
 
       sTag := 'Actors.Skeleton';
-      if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+      if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
         ProcessTag(sTag, e, o);
 
       sTag := 'Actors.Stats';
-      if not CompareFlags(sTag, e, o, sElement, 'Use Stats', False, False) then
+      if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Stats', False, False) then
         ProcessTag(sTag, e, o);
 
       // TODO: IIM - NOT IMPLEMENTED
@@ -367,20 +468,20 @@ begin
       if sSignature = 'NPC_' then
       begin
         sTag := 'NPC.Class';
-        if not CompareFlags(sTag, e, o, sElement, 'Use Traits', False, False) then
+        if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Traits', False, False) then
           ProcessTag(sTag, e, o);
 
         sTag := 'NPC.Race';
-        if not CompareFlags(sTag, e, o, sElement, 'Use Traits', False, False) then
+        if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Traits', False, False) then
           ProcessTag(sTag, e, o);
 
         sTag := 'NpcFaces';
-        if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+        if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
           ProcessTag(sTag, e, o);
       end;
 
       sTag := 'Scripts';
-      if not CompareFlags(sTag, e, o, sElement, 'Use Script', False, False) then
+      if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Script', False, False) then
         ProcessTag(sTag, e, o);
     end;
 
@@ -485,18 +586,18 @@ begin
       if not wbIsOblivion then
       begin
         sTag := 'Invent';
-        if not CompareFlags(sTag, e, o, sElement, 'Use Inventory', False, False) then
+        if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Inventory', False, False) then
           ProcessTag(sTag, e, o);
 
         // special handling for CREA and NPC_ record types
         sTag := 'Names';
-        if not CompareFlags(sTag, e, o, sElement, 'Use Base Data', False, False) then
+        if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Base Data', False, False) then
           ProcessTag(sTag, e, o);
 
         // special handling for CREA record type
         sTag := 'Sound';
         if sSignature = 'CREA' then
-          if not CompareFlags(sTag, e, o, sElement, 'Use Model/Animation', False, False) then
+          if not CompareFlags(sTag, e, o, 'ACBS\Template Flags', 'Use Model/Animation', False, False) then
             ProcessTag(sTag, e, o);
       end;
     end;
@@ -545,109 +646,12 @@ begin
 end;
 
 function Finalize: Integer;
-var
-  kHeader         : IInterface;
-  kDescription    : IInterface;
-  slExistingTags  : TStringList;
-  slDifferentTags : TStringList;
-  slBadTags       : TStringList;
-  sDescription    : String;
-  sBashTags       : String;
-  i               : Integer;
 begin
-  slExistingTags  := TStringList.Create; // existing tags
-  slDifferentTags := TStringList.Create; // different tags
-  slBadTags       := TStringList.Create; // bad tags
-
-  // exit conditions
-  if (optionAddTags = mrAbort)
-  or (optionOutputLog = mrAbort)
-  or not Assigned(sFileName) then
-    exit;
-
-  // output file name
-  LogInfo(Uppercase(sFileName));
-
-  AddMessage(#10);
-
-  // output log
-  if optionOutputLog = mrYes then
-    for i := 0 to Pred(slLog.Count) do
-      LogInfo(slLog[i]);
-
-  if (optionOutputLog = mrYes) and (slLog.Count > 0) then
-    AddMessage(#10);
-
-  // if any suggested tags were generated
-  if slSuggestedTags.Count > 0 then
+  if not Assigned(kFile) then
   begin
-    kHeader := ElementBySignature(kFile, 'TES4');
-
-    // determine if the header record exists
-    if Assigned(kHeader) then
-    begin
-      kDescription := ElementBySignature(kHeader, 'SNAM');
-      sDescription := GetEditValue(kDescription);
-
-      // categorize tag list
-      sBashTags := RegExMatch('(?:[{]{2}BASH:).*?[}]{2}', sDescription);
-      if Length(sBashTags) > 0 then
-      begin
-        sBashTags := Trim(MidStr(sBashTags, 8, Length(sBashTags) - 9));
-        slExistingTags.CommaText := sBashTags;
-      end else
-        slExistingTags.CommaText := '';
-
-      slDifferentTags := Diff(slSuggestedTags, slExistingTags);
-      slBadTags := Diff(slExistingTags, slSuggestedTags);
-      slSuggestedTags.AddStrings(slDifferentTags);
-
-      // exit if existing and suggested tags are the same
-      if SameText(slExistingTags.CommaText, slSuggestedTags.CommaText) then
-      begin
-        LogInfo(FormatTags(slExistingTags, 'existing tag found:', 'existing tags found:', 'No existing tags found.'));
-        LogInfo(FormatTags(slSuggestedTags, 'suggested tag:', 'suggested tags:', 'No suggested tags.'));
-        LogWarn('No tags to add.' + #13#10);
-        exit;
-      end;
-
-    // exit if the header record doesn't exist
-    end else begin
-      LogError('Header record not found. Nothing to do. Exiting.' + #13#10);
-      exit;
-    end;
-
-    // write tags
-    if optionAddTags = mrYes then
-    begin
-      // if the description element doesn't exist, add the element
-      kDescription := ElementBySignature(kHeader, 'SNAM');
-      if not Assigned(kDescription) then
-        kDescription := Add(kHeader, 'SNAM', True);
-
-      if not SameText(slExistingTags.CommaText, slSuggestedTags.CommaText) then
-      begin
-        sDescription := GetEditValue(kDescription);
-        sDescription := Trim(RemoveFromEnd(sDescription, Format('{{BASH:%s}}', [slExistingTags.DelimitedText])));
-        SetEditValue(kDescription, sDescription + #13#10 + #13#10 + Format('{{BASH:%s}}', [slSuggestedTags.DelimitedText]));
-      end;
-
-      LogInfo(FormatTags(slBadTags,       'bad tag removed:',          'bad tags removed:',          'No bad tags found.'));
-      LogInfo(FormatTags(slDifferentTags, 'tag added to file header:', 'tags added to file header:', 'No tags added.'));
-    end;
-
-    // suggest tags only and output to log
-    if optionAddTags = mrNo then
-    begin
-      LogInfo(FormatTags(slExistingTags,  'existing tag found:',    'existing tags found:',    'No existing tags found.'));
-      LogInfo(FormatTags(slBadTags,       'bad tag found:',         'bad tags found:',         'No bad tags found.'));
-      LogInfo(FormatTags(slDifferentTags, 'suggested tag to add:',  'suggested tags to add:',  'No suggested tags to add.'));
-      LogInfo(FormatTags(slSuggestedTags, 'suggested tag overall:', 'suggested tags overall:', 'No suggested tags overall.'));
-    end;
-  end else
-  	LogInfo('No tags are suggested for this plugin.');
-
-  AddMessage(#10);
+    LogInfo('Script execution was aborted.' + #13#10);
+    exit;
+  end;
 
   slLog.Free;
   slSuggestedTags.Free;
@@ -725,7 +729,7 @@ begin
     kElement := ElementByIndex(akElement, i);
 
     if SameText(Name(kElement), 'unknown') or SameText(Name(kElement), 'unused') then
-      exit;
+      continue;
 
     if Result <> '' then
       Result := Result + ' ' + SortKeyEx(kElement)
@@ -927,6 +931,35 @@ begin
 end;
 
 
+function HighestOverrideOrSelfInList(akMainRecord: IInterface; aiMaxLoadOrder: Integer; aslMasterPlugins: TStringList): IInterface;
+var
+  kMaster   : IwbMainRecord;
+  kFile     : IwbFile;
+  sFileName : String;
+  i         : Integer;
+begin
+  Result := akMainRecord;
+
+  kMaster := MasterOrSelf(akMainRecord);
+
+  for i := Pred(OverrideCount(akMainRecord)) downto 0 do
+  begin
+    kFile := GetFile(OverrideByIndex(kMaster, i));
+    sFileName := GetFileName(kFile);
+
+    // skip plugins that aren't masters because we don't care about them
+    if aslMasterPlugins.IndexOf(sFileName) = -1 then
+      continue;
+
+    if GetLoadOrder(kFile) <= aiMaxLoadOrder then
+    begin
+      Result := OverrideByIndex(kMaster, i);
+      exit;
+    end;
+  end;
+end;
+
+
 function SortedArrayElementByValue(e: IInterface; sPath, sValue: String): IInterface;
 var
   i: Integer;
@@ -963,28 +996,32 @@ function IsEmptyKey(asSortKey: String): Boolean;
 var
   i : Integer;
 begin
+  Result := True;
   for i := 1 to Length(asSortKey) do
-  begin
     if asSortKey[i] = '1' then
     begin
       Result := False;
       exit;
     end;
-    Result := True;
-  end;
 end;
 
 
-function FormatTags(lsTags: TStringList; asSingular, asPlural, asNull: String): String;
+function FormatTags(aslTags: TStringList; asSingular, asPlural, asNull: String): String;
+var
+  iTagCount : Integer;
+  sTagCount : String;
 begin
-  if lsTags.Count = 1 then
-    Result := IntToStr(lsTags.Count) + ' ' + asSingular
-  else
-  if lsTags.Count > 1 then
-    Result := IntToStr(lsTags.Count) + ' ' + asPlural;
+  iTagCount := aslTags.Count;
+  sTagCount := IntToStr(iTagCount);
 
-  if lsTags.Count > 0 then
-    Result := Result + Format(' {{BASH:%s}}', [lsTags.DelimitedText])
+  if iTagCount = 1 then
+    Result := sTagCount + ' ' + asSingular + #13#10#32#32#32#32#32#32
+  else
+  if iTagCount > 1 then
+    Result := sTagCount + ' ' + asPlural + #13#10#32#32#32#32#32#32;
+
+  if iTagCount > 0 then
+    Result := Result + Format(' {{BASH:%s}}', [aslTags.DelimitedText])
   else
     Result := asNull;
 end;
@@ -1570,6 +1607,28 @@ begin
       exit;
   end;
 
+  // Bookmark: Keywords
+  if asTag = 'Keywords' then
+  begin
+    x := ElementBySignature(e, 'KWDA');
+    y := ElementBySignature(m, 'KWDA');
+
+    if CompareAssignment(asTag, x, y) then
+      exit;
+
+    if CompareElementCount(asTag, x, y) then
+      exit;
+
+    x := ElementBySignature(e, 'KSIZ');
+    y := ElementBySignature(m, 'KSIZ');
+
+    if CompareAssignment(asTag, x, y) then
+      exit;
+
+    if CompareEditValue(asTag, x, y) then
+      exit;
+  end;
+
   // Bookmark: NPC.Class
   if asTag = 'NPC.Class' then
     EvaluateByPath(asTag, e, m, 'CNAM');
@@ -1777,7 +1836,6 @@ begin
   // Bookmark: WeaponMods
   if asTag = 'WeaponMods' then
     EvaluateByPath(asTag, e, m, 'Weapon Mods');
-
 end;
 
 // Bookmark: Delev, Relev
@@ -1813,7 +1871,7 @@ begin
   j := 0;
 
   // iterate through all entries
-  for i := 0 to ElementCount(kEntries) - 1 do
+  for i := 0 to Pred(ElementCount(kEntries)) do
   begin
     sElement := 'LVLO\Reference';
     kEntry := ElementByIndex(kEntries, i);
@@ -1876,6 +1934,155 @@ begin
 
   slLog.Add(sPrefix + PathName(m));
   slLog.Add(sPrefix + PathName(e));
+end;
+
+
+function FileByName(asFileName: String): IwbFile;
+var
+  kFile : IwbFile;
+  i     : Integer;
+begin
+  Result := nil;
+
+  for i := 0 to Pred(FileCount) do
+  begin
+    kFile := FileByIndex(i);
+    if asFileName = GetFileName(kFile) then
+    begin
+      Result := kFile;
+      exit;
+    end;
+  end;
+end;
+
+
+procedure EscKeyHandler(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if Key = 27 then
+    Sender.Close;
+end;
+
+
+procedure chkAddTagsClick(Sender: TObject);
+begin
+  if optionAddTags = mrYes then
+    optionAddTags := mrNo
+  else
+    optionAddTags := mrYes;
+end;
+
+
+procedure chkLoggingClick(Sender: TObject);
+begin
+  if optionOutputLog = mrYes then
+    optionOutputLog := mrNo
+  else
+    optionOutputLog := mrYes;
+end;
+
+
+function Configure(asCaption: String): IwbFile;
+var
+  frm        : TForm;
+  lblPlugins : TLabel;
+  chkAddTags : TCheckBox;
+  chkLogging : TCheckBox;
+  cbbPlugins : TComboBox;
+  btnCancel  : TButton;
+  btnOk      : TButton;
+  i          : Integer;
+
+  kFile      : IwbFile;
+begin
+  Result := nil;
+
+  frm := TForm.Create(TForm(frmMain));
+
+  try
+    frm.Caption      := asCaption;
+    frm.BorderStyle  := bsToolWindow;
+    frm.ClientWidth  := 234 * scaleFactor;
+    frm.ClientHeight := 154 * scaleFactor;
+    frm.Position     := poScreenCenter;
+    frm.KeyPreview   := True;
+    frm.OnKeyDown    := EscKeyHandler;
+
+    lblPlugins := TLabel.Create(frm);
+    lblPlugins.Parent   := frm;
+    lblPlugins.Left     := 16 * scaleFactor;
+    lblPlugins.Top      := 64 * scaleFactor;
+    lblPlugins.Width    := 200 * scaleFactor;
+    lblPlugins.Height   := 16 * scaleFactor;
+    lblPlugins.Caption  := 'Select file to analyze:';
+    lblPlugins.AutoSize := False;
+
+    chkAddTags := TCheckBox.Create(frm);
+    chkAddTags.Parent   := frm;
+    chkAddTags.Left     := 16 * scaleFactor;
+    chkAddTags.Top      := 16 * scaleFactor;
+    chkAddTags.Width    := 185 * scaleFactor;
+    chkAddTags.Height   := 16 * scaleFactor;
+    chkAddTags.Caption  := 'Write suggested tags to header';
+    chkAddTags.Checked  := False;
+    chkAddTags.OnClick  := chkAddTagsClick;
+    chkAddTags.TabOrder := 0;
+
+    chkLogging := TCheckBox.Create(frm);
+    chkLogging.Parent   := frm;
+    chkLogging.Left     := 16 * scaleFactor;
+    chkLogging.Top      := 39 * scaleFactor;
+    chkLogging.Width    := 185 * scaleFactor;
+    chkLogging.Height   := 16 * scaleFactor;
+    chkLogging.Caption  := 'Log test results to Messages tab';
+    chkLogging.Checked  := True;
+    chkLogging.OnClick  := chkLoggingClick;
+    chkLogging.TabOrder := 1;
+
+    cbbPlugins := TComboBox.Create(frm);
+    cbbPlugins.Parent         := frm;
+    cbbPlugins.Left           := 16 * scaleFactor;
+    cbbPlugins.Top            := 85 * scaleFactor;
+    cbbPlugins.Width          := 200 * scaleFactor;
+    cbbPlugins.Height         := 21 * scaleFactor;
+    cbbPlugins.Style          := csDropDownList;
+    cbbPlugins.DoubleBuffered := True;
+    cbbPlugins.TabOrder       := 2;
+
+    for i := 0 to Pred(FileCount) do
+    begin
+      kFile := FileByIndex(i);
+      if IsEditable(kFile) then
+        cbbPlugins.Items.Add(GetFileName(kFile));
+    end;
+
+    cbbPlugins.ItemIndex      := Pred(cbbPlugins.Items.Count);
+
+    btnOk := TButton.Create(frm);
+    btnOk.Parent              := frm;
+    btnOk.Left                := 62 * scaleFactor;
+    btnOk.Top                 := 120 * scaleFactor;
+    btnOk.Width               := 75 * scaleFactor;
+    btnOk.Height              := 25 * scaleFactor;
+    btnOk.Caption             := 'Run';
+    btnOk.Default             := True;
+    btnOk.ModalResult         := mrOk;
+    btnOk.TabOrder            := 3;
+
+    btnCancel := TButton.Create(frm);
+    btnCancel.Parent          := frm;
+    btnCancel.Left            := 143 * scaleFactor;
+    btnCancel.Top             := 120 * scaleFactor;
+    btnCancel.Width           := 75 * scaleFactor;
+    btnCancel.Height          := 25 * scaleFactor;
+    btnCancel.Caption         := 'Abort';
+    btnCancel.ModalResult     := mrAbort;
+    btnCancel.TabOrder        := 4;
+
+    if frm.ShowModal = mrOk then
+      Result := FileByName(cbbPlugins.Text);
+  finally
+    frm.Free;
+  end;
 end;
 
 end.
