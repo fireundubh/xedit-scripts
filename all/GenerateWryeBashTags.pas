@@ -28,6 +28,8 @@ var
   optionAddTags   : Integer;
   optionOutputLog : Integer;
   bQuickExit      : Boolean;
+  bFirstProcess   : Boolean;
+  sGuiPlugin      : String;
 
 
 function wbIsOblivion: Boolean;
@@ -107,6 +109,36 @@ end;
 
 
 function Initialize: Integer;
+begin
+  sScriptName    := 'GenerateWryeBashTags'; // working name
+  sScriptVersion := '1.6.3.0';
+  sScriptAuthor  := 'fireundubh';
+  sScriptEmail   := 'fireundubh@gmail.com';
+  bFirstProcess  := true;
+  sGuiPlugin     := '';
+
+  Result := 0;
+
+  // clear
+  ClearMessages();
+
+  // show script header
+  AddMessage(#10);
+  LogInfo(sScriptName + ' v' + sScriptVersion + ' by ' + sScriptAuthor + ' <' + sScriptEmail + '>');
+  AddMessage(#10);
+end;
+
+function Process(e: IInterface): integer;
+begin
+  if bFirstProcess then
+  begin
+    bFirstProcess := false;
+	sGuiPlugin := GetFileName(e);
+    Result := Work();
+  end
+end;
+  
+function Work: Integer;
 var
   kDescription : IInterface;
   kHeader      : IInterface;
@@ -116,18 +148,6 @@ var
   r            : IwbMainRecord;
   i            : Integer;
 begin
-  sScriptName    := 'GenerateWryeBashTags'; // working name
-  sScriptVersion := '1.6.3.0';
-  sScriptAuthor  := 'fireundubh';
-  sScriptEmail   := 'fireundubh@gmail.com';
-
-  // clear
-  ClearMessages();
-
-  // show script header
-  AddMessage(#10);
-  LogInfo(sScriptName + ' v' + sScriptVersion + ' by ' + sScriptAuthor + ' <' + sScriptEmail + '>');
-  AddMessage(#10);
 
   optionAddTags   := mrNo;
   optionOutputLog := mrYes;
@@ -1976,9 +1996,14 @@ var
   btnCancel  : TButton;
   btnOk      : TButton;
   i          : Integer;
+  iGuiPlugin : Integer;
 
   kFile      : IwbFile;
+
+  sName : String;
+
 begin
+
   Result := nil;
 
   frm := TForm.Create(TForm(frmMain));
@@ -2033,14 +2058,25 @@ begin
     cbbPlugins.DoubleBuffered := True;
     cbbPlugins.TabOrder       := 2;
 
+    iGuiPlugin := -1;
     for i := 0 to Pred(FileCount) do
     begin
       kFile := FileByIndex(i);
       if IsEditable(kFile) then
-        cbbPlugins.Items.Add(GetFileName(kFile));
+      begin
+        sName := GetFileName(kFile);
+        cbbPlugins.Items.Add(sName);
+        if CompareText(sName, sGuiPlugin) = 0 then
+          iGuiPlugin := Pred(cbbPlugins.Items.Count);
+      end;
     end;
 
-    cbbPlugins.ItemIndex      := Pred(cbbPlugins.Items.Count);
+    if iGuiPlugin = -1 then
+    begin
+      cbbPlugins.ItemIndex      := Pred(cbbPlugins.Items.Count);
+    end else begin
+      cbbPlugins.ItemIndex      := iGuiPlugin;
+    end
 
     btnOk := TButton.Create(frm);
     btnOk.Parent              := frm;
